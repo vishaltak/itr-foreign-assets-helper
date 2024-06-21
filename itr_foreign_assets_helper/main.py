@@ -23,7 +23,10 @@ def main():
         required=True,
         help='ETrade holdings file.')
     args = parser.parse_args()
-    etrade_wb = etrade.convert(holdings_file=args.etrade_holdings)
+
+    etrade_data = etrade.ETrade()
+    etrade_data.get_shares_issued(holdings_file=args.etrade_holdings)
+    
     logger.info('ITR Data')
     logger.info('ETrade')
-    logger.info(etrade_wb)
+    logger.info(etrade_data)
