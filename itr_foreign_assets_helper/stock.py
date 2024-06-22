@@ -25,7 +25,7 @@ class CashRecord:
         return f'{self.__class__.__name__}({attrs})'
 
 
-class StockRecord:
+class ShareRecord:
 
     def __init__(
         self,
@@ -43,7 +43,7 @@ class StockRecord:
     
     @property
     def transaction_type(self):
-        raise NotImplementedError(f'${__name__} should set transaction_type')
+        raise NotImplementedError(f'{__name__} should set transaction_type')
 
     def __repr__(self) -> str:
         attrs = ', '.join(f'{key}={value!r}' for key, value in vars(self).items())
@@ -54,7 +54,7 @@ class StockRecord:
         return f'{self.__class__.__name__}({attrs})'
 
 
-class StockReleasedRecord(StockRecord):
+class ShareReleasedRecord(ShareRecord):
 
     def __init__(
         self,
@@ -77,7 +77,7 @@ class StockReleasedRecord(StockRecord):
         return 'released'
 
 
-class StockSoldRecord(StockRecord):
+class ShareSoldRecord(ShareRecord):
     def __init__(
         self,
         source_metadata: typing.Dict,

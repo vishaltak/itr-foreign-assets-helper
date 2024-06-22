@@ -6,7 +6,7 @@ import typing
 
 from . import etrade
 from . import forex
-from . import itr
+from . import itr_schedule_fa
 
 
 logging.basicConfig(
@@ -29,10 +29,10 @@ logger = logging.getLogger(__name__)
 def validate_financial_year_input(input) -> typing.Tuple[datetime.date, datetime.date]:
     match = re.match(r'^(\d{4})-(\d{4})$', input)
     if not match:
-        raise argparse.ArgumentTypeError(f'Invalid financial year format: ${input}. Expected format is YYYY-YYYY.')
+        raise argparse.ArgumentTypeError(f'Invalid financial year format: {input}. Expected format is YYYY-YYYY.')
     start_year, end_year = map(int, match.groups())
     if end_year != start_year + 1:
-        raise argparse.ArgumentTypeError(f'Invalid financial year format: ${input}. Gap between years should only be 1.')
+        raise argparse.ArgumentTypeError(f'Invalid financial year format: {input}. Gap between years should only be 1.')
     financial_year_start_date = datetime.date(year=start_year, month=4, day=1)
     financial_year_end_year = datetime.date(year=end_year, month=3, day=31)
     return financial_year_start_date, financial_year_end_year
@@ -70,13 +70,24 @@ def main():
     )
 
     sbi_reference_rates = forex.SBIReferenceRates(args.sbi_reference_rates)
-    itr_schedule_fa_a3 = itr.ScheduleFAA3(
+
+    itr_schedule_fa_a3 = itr_schedule_fa.ScheduleFAA3(
         stocks_released=etrade_transcations.stocks_released,
         stocks_sold=etrade_transcations.stocks_sold,
         sbi_reference_rates=sbi_reference_rates,
         financial_year=args.financial_year
     )
 
+    itr_schedule_fa_a2 = itr_schedule_fa.ScheduleFAA2(
+        cash=etrade_transcations.cash,
+        sbi_reference_rates=sbi_reference_rates,
+        financial_year=args.financial_year
+    )
+
     logger.info('ITR Data')
+
     logger.info('Schedule FA A3')
     logger.info(itr_schedule_fa_a3.entries)
+
+    logger.info('Schedule FA A2')
+    logger.info(itr_schedule_fa_a2.entries)

@@ -59,7 +59,7 @@ class ETradeTransactions:
             curr_row_num += 1
         return data
     
-    def __get_stocks_released(self, holdings_file: typing.IO) -> typing.List[stock.StockReleasedRecord]:
+    def __get_stocks_released(self, holdings_file: typing.IO) -> typing.List[stock.ShareReleasedRecord]:
         sheet_name = 'Sellable'
         required_columns = {
             'Symbol': 'ticker',
@@ -81,7 +81,7 @@ class ETradeTransactions:
             row_to_skip_at_end=row_to_skip_at_end,
         )
         for stock_data in raw_stocks_data:
-            stock_released = stock.StockReleasedRecord(
+            stock_released = stock.ShareReleasedRecord(
                 source_metadata=stock_data['source_metadata'],
                 broker=self.broker,
                 comments='',
@@ -89,13 +89,13 @@ class ETradeTransactions:
                 award_number=int(stock_data['award_number']),
                 shares_issued=stock_data['shares_issued'],
                 release_date=datetime.datetime.strptime(stock_data['release_date'], '%d-%b-%Y').date(),
-                market_value_per_share=float(stock_data['market_value_per_share'].replace('$', '')),
+                market_value_per_share=float(str(stock_data['market_value_per_share']).replace('$', '')),
             )
             logger.debug(stock_released)
             stocks_released.append(stock_released)
         return stocks_released
 
-    def __get_stocks_sold(self, sale_transactions_file: typing.IO) -> typing.List[stock.StockSoldRecord]:
+    def __get_stocks_sold(self, sale_transactions_file: typing.IO) -> typing.List[stock.ShareSoldRecord]:
         sheet_name = 'G&L_Expanded'
         required_columns = {
             'Symbol': 'ticker',
@@ -121,7 +121,7 @@ class ETradeTransactions:
             row_to_skip_at_end=row_to_skip_at_end,
         )
         for stock_data in raw_stocks_data:
-            stock_sold = stock.StockSoldRecord(
+            stock_sold = stock.ShareSoldRecord(
                 source_metadata=stock_data['source_metadata'],
                 broker=self.broker,
                 comments='',
@@ -156,7 +156,7 @@ class ETradeTransactions:
             row_to_skip_at_end=row_to_skip_at_end,
         )
         if len(raw_cash_data) != 1:
-            raise Exception(f'Failed to extract cash holdings for ${self.broker}')
+            raise Exception(f'Failed to extract cash holdings for {self.broker}')
         cash = stock.CashRecord(
             source_metadata=raw_cash_data[0]['source_metadata'],
             broker=self.broker,

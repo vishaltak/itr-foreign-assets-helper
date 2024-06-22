@@ -34,7 +34,7 @@ make poetry-shell
 - Click on "Download" and select "Download Expanded".
 - This will download the ETrade Holdings file in XLSX format.
 
-# Gains and Losses
+#### Gains and Losses
 
 - Login to ETrade.
 - Hover over "At Work" in the top navbar and select "My Account".
