@@ -2,6 +2,29 @@ import datetime
 import typing
 
 
+class CashRecord:
+
+    def __init__(
+        self,
+        source_metadata: typing.Dict,
+        broker: str,
+        comments: str,
+        amount: float,
+    ) -> None:
+        self.source_metadata = source_metadata
+        self.broker = broker
+        self.comments = comments
+        self.amount = amount
+
+    def __repr__(self) -> str:
+        attrs = ', '.join(f'{key}={value!r}' for key, value in vars(self).items())
+        return f'{self.__class__.__name__}({attrs})'
+    
+    def __str__(self) -> str:
+        attrs = ', '.join(f'{key}={value}' for key, value in vars(self).items())
+        return f'{self.__class__.__name__}({attrs})'
+
+
 class StockRecord:
 
     def __init__(

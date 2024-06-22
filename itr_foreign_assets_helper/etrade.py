@@ -21,6 +21,7 @@ class ETradeTransactions:
         self.broker = "ETrade"
         self.stocks_released = self.__get_stocks_released(holdings_file=holdings_file)
         self.stocks_sold = self.__get_stocks_sold(sale_transactions_file=sale_transactions_file)
+        self.cash = self.__get_cash(holdings_file=holdings_file)
     
     def __extract_data(
             self,
@@ -135,3 +136,32 @@ class ETradeTransactions:
             logger.debug(stock_sold)
             stocks_sold.append(stock_sold)
         return stocks_sold
+    
+    def __get_cash(self, holdings_file: typing.IO) -> stock.CashRecord:
+        sheet_name = 'Other Holdings'
+        required_columns = {
+            'Est. Market Value': 'amount',
+        }
+        cash = None
+        # the first row is the column names and hence skipped
+        # the second row is empty with lines and hence skipped
+        row_to_skip_at_start = 2
+        # the last row caontains the cash as total
+        row_to_skip_at_end = 0
+        raw_cash_data = self.__extract_data(
+            file=holdings_file,
+            sheet_name=sheet_name,
+            required_columns=required_columns,
+            row_to_skip_at_start=row_to_skip_at_start,
+            row_to_skip_at_end=row_to_skip_at_end,
+        )
+        if len(raw_cash_data) != 1:
+            raise Exception(f'Failed to extract cash holdings for ${self.broker}')
+        cash = stock.CashRecord(
+            source_metadata=raw_cash_data[0]['source_metadata'],
+            broker=self.broker,
+            comments='',
+            amount=float(str(raw_cash_data[0]['amount']).replace('$', '')),
+        )
+        logger.debug(cash)
+        return cash
