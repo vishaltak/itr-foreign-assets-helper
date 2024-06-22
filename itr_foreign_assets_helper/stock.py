@@ -62,7 +62,6 @@ class StockSoldRecord(StockRecord):
         comments: str,
         ticker: str,
         award_number: int,
-        shares_issued: int,
         release_date: datetime.date,
         market_value_per_share: float,
         shares_sold: int,
@@ -70,7 +69,6 @@ class StockSoldRecord(StockRecord):
         sale_value_per_share: float,
     ) -> None:
         super().__init__(source_metadata, broker, comments, ticker, award_number)
-        self.shares_issued = shares_issued
         self.release_date = release_date
         self.market_value_per_share = market_value_per_share
         self.shares_sold = shares_sold

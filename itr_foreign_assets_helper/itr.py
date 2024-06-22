@@ -59,13 +59,15 @@ class ScheduleFAA3Record(ScheduleRecord):
 
         # depending on the tranction_type of the stock, set the approrpriate attributes.
         if self.transaction_type == 'released':
+            self.shares_issued = stock.shares_issued
             self.__set_release_date_metadata(stock=stock, sbi_reference_rates=sbi_reference_rates)
-            self.__set_year_end_metadata(stock=stock, sbi_reference_rates=sbi_reference_rates, financial_year=financial_year)
+            self.__set_year_end_metadata(sbi_reference_rates=sbi_reference_rates, financial_year=financial_year)
             # for financial year 2023-2024, the end_date to consider for peak closing for
             # stock that are held would be year_closing_date e.g. 2023-12-31 .
             # since Schedule FA records are from January 1 to December 31.
             self.peak_closing_high_date, self.peak_closing_high_value = self.__get_stock_peak_closing_data(start_date=self.release_date, end_date=self.year_closing_date)
         elif self.transaction_type == 'sold':
+            self.shares_sold = stock.shares_sold
             self.__set_release_date_metadata(stock=stock, sbi_reference_rates=sbi_reference_rates)
             self.__set_sale_date_metadata(stock=stock, sbi_reference_rates=sbi_reference_rates)
             # since th stock was sold, the end_date to consider for peak closing for
@@ -79,7 +81,6 @@ class ScheduleFAA3Record(ScheduleRecord):
         stock: stock.StockRecord,
         sbi_reference_rates: forex.SBIReferenceRates,
     ) -> None:
-        self.shares_issued = stock.shares_issued
         self.release_date = stock.release_date
         self.market_value_per_share = stock.market_value_per_share
         # release_date_adjusted_for_tt_buy_rate will be the last day of the previous month.
@@ -91,7 +92,6 @@ class ScheduleFAA3Record(ScheduleRecord):
         stock: stock.StockRecord,
         sbi_reference_rates: forex.SBIReferenceRates,
     ) -> None:
-        self.shares_sold = stock.shares_sold
         self.sale_date = stock.sale_date
         self.sale_value_per_share = stock.sale_value_per_share
         # sale_date_adjusted_for_tt_buy_rate will be the last day of the previous month.
@@ -100,7 +100,6 @@ class ScheduleFAA3Record(ScheduleRecord):
 
     def __set_year_end_metadata(
             self,
-            stock: stock.StockRecord,
             sbi_reference_rates: forex.SBIReferenceRates,
             financial_year: typing.Tuple[datetime.date, datetime.date],
     ) -> None:

@@ -55,12 +55,18 @@ def main():
     parser.add_argument('--etrade-holdings',
         type=argparse.FileType('rb'),
         required=True,
-        help='ETrade holdings file.'
+        help='ETrade holdings file at the end of financial year i.e. right after 31 March'
+    )
+    parser.add_argument('--etrade-sale-transactions',
+        type=argparse.FileType('rb'),
+        required=True,
+        help='ETrade sale transactions file for financial year i.e. 1 January to 31 March(next year). The records for 1 January to 31 March(end of previous Indian financial year year) are required for Schedule FA and the records from 1 April(start of current Indian financial year year) to 31 March(end of Indian financial year year) are required for Schedule CG and Schedule AL.'
     )
     args = parser.parse_args()
 
     etrade_transcations = etrade.ETradeTransactions(
-        holdings_file=args.etrade_holdings
+        holdings_file=args.etrade_holdings,
+        sale_transactions_file=args.etrade_sale_transactions
     )
 
     sbi_reference_rates = forex.SBIReferenceRates(args.sbi_reference_rates)
