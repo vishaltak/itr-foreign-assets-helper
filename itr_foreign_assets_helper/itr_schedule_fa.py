@@ -29,9 +29,10 @@ class ScheduleFAA2Record(itr.ScheduleRecord):
         self.year_closing_date_adjusted_for_tt_buy_rate, self.tt_buy_rate_for_year_closing_date = sbi_reference_rates.on_date(self.year_closing_date, adjust_to_last_day_of_previous_month=False)
 
         # TODO: need to think about this more
+        # the final fields that are required while filing the ITR
         self.peak_balance_during_period = cash.amount * self.tt_buy_rate_for_year_closing_date.tt_buy_exchange_rate
         self.closing_balance = cash.amount * self.tt_buy_rate_for_year_closing_date.tt_buy_exchange_rate
-        self.gross_amount_paid_or_credited_to_account_during_period = 0.0
+        self.total_gross_amount_paid_or_credited_to_account_during_period = 0.0
         self.nature_of_income = 'Not Applicable'
 
 
@@ -99,6 +100,11 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         self.market_value_per_share_on_year_closing_date = None
         self.year_closing_date_adjusted_for_tt_buy_rate = None
         self.tt_buy_rate_for_year_closing_date = None
+        # the following attributes are set in __set_peak_date_metadata()
+        self.peak_closing_high_date = None
+        self.peak_closing_high_value = None
+        self.peak_closing_high_date_adjusted_for_tt_buy_rate = None
+        self.tt_buy_rate_for_peak_closing_high_date = None
 
         # depending on the tranction_type of the stock, set the approrpriate attributes.
         if self.transaction_type == 'released':
@@ -108,17 +114,36 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
             # for financial year 2023-2024, the end_date to consider for peak closing for
             # stock that are held would be year_closing_date e.g. 2023-12-31 .
             # since Schedule FA records are from January 1 to December 31.
-            self.peak_closing_high_date, self.peak_closing_high_value = self.__get_stock_peak_closing_data(start_date=self.release_date, end_date=self.year_closing_date)
+            self.__set_peak_date_metadata(start_date=self.release_date, end_date=self.year_closing_date, sbi_reference_rates=sbi_reference_rates)
+            # the final fields that are required while filing the ITR
+            self.date_of_acquiring_interest = self.release_date
+            self.initial_value_of_investment = self.shares_issued * self.market_value_per_share * self.tt_buy_rate_for_release_date.tt_buy_exchange_rate
+            self.peak_value_of_investment_during_period = self.shares_issued * self.peak_closing_high_value * self.tt_buy_rate_for_peak_closing_high_date.tt_buy_exchange_rate
+            self.closing_value = self.shares_issued * self.market_value_per_share_on_year_closing_date * self.tt_buy_rate_for_year_closing_date.tt_buy_exchange_rate
+            # since there is no dividend being paid, it is set to 0.0
+            self.total_gross_amount_paid_or_credited_to_account_during_period = 0.0
+            # since there is no sale and thus no proceed, it is set to 0.0
+            self.total_gross_proceeds_from_sale_or_redemption_of_investment_during_period = 0.0
         elif self.transaction_type == 'sold':
             self.shares_sold = stock.shares_sold
             self.__set_release_date_metadata(stock=stock, sbi_reference_rates=sbi_reference_rates)
             self.__set_sale_date_metadata(stock=stock, sbi_reference_rates=sbi_reference_rates)
             # since th stock was sold, the end_date to consider for peak closing for
             # stock would be the sale_date of the stock.
-            self.peak_closing_high_date, self.peak_closing_high_value = self.__get_stock_peak_closing_data(start_date=self.release_date, end_date=self.sale_date)
+            self.__set_peak_date_metadata(start_date=self.release_date, end_date=self.sale_date, sbi_reference_rates=sbi_reference_rates)
+            # the final fields that are required while filing the ITR
+            self.date_of_acquiring_interest = self.release_date
+            self.initial_value_of_investment = self.shares_sold * self.market_value_per_share * self.tt_buy_rate_for_release_date.tt_buy_exchange_rate
+            self.peak_value_of_investment_during_period = self.shares_sold * self.peak_closing_high_value * self.tt_buy_rate_for_peak_closing_high_date.tt_buy_exchange_rate
+            # since there is a sale and thus not retained at end of year, it is set to 0.0
+            self.closing_value = 0.0
+            # since there is no dividend being paid, it is set to 0.0
+            self.total_gross_amount_paid_or_credited_to_account_during_period = 0.0
+            self.total_gross_proceeds_from_sale_or_redemption_of_investment_during_period = self.shares_sold * self.sale_value_per_share * self.tt_buy_rate_for_sale_date.tt_buy_exchange_rate
         else:
             raise ValueError(f'Invalid transaction_type: {self.transaction_type}')
     
+
     def __set_release_date_metadata(
         self,
         stock: stock.ShareRecord,
@@ -152,6 +177,17 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         # for year_closing_date_adjusted_for_tt_buy_rate , if the sbi_reference_rates.on_date for that day is missing, it will keep subtracting one day till it finds a exchange rate.
         self.year_closing_date_adjusted_for_tt_buy_rate, self.tt_buy_rate_for_year_closing_date = sbi_reference_rates.on_date(self.year_closing_date_adjusted_for_market_closure, adjust_to_last_day_of_previous_month=False)
 
+    def __set_peak_date_metadata(
+        self,
+        start_date: datetime.date,
+        end_date: datetime.date,
+        sbi_reference_rates: forex.SBIReferenceRates,
+    ) -> None:
+        self.peak_closing_high_date, self.peak_closing_high_value = self.__get_stock_peak_closing_data(start_date=start_date, end_date=end_date)
+        # peak_closing_high_date_adjusted_for_tt_buy_rate will be the last day of the previous month.
+        # however, if the sbi_reference_rates.on_date for that day is missing, it will keep subtracting one day till it finds a exchange rate.
+        self.peak_closing_high_date_adjusted_for_tt_buy_rate, self.tt_buy_rate_for_peak_closing_high_date = sbi_reference_rates.on_date(self.peak_closing_high_date, adjust_to_last_day_of_previous_month=True)
+
     def __get_stock_year_closing_data(self, year_closing_date: datetime.date) -> typing.Tuple[datetime.date, float]:
         if year_closing_date.day != 31 or year_closing_date.month != 12:
             raise Exception(f'Invalid date for calculating the market close value at year end for ticker: {year_closing_date} . Example vlaues would be 2023-12-31')
@@ -164,6 +200,8 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         stock_data = yfinance.download([self.ticker], start=adjusted_start_date, end=year_closing_date + datetime.timedelta(days=1))
         # ensure the data is sorted by date
         stock_data.sort_index(inplace=True)
+        # TODO: for some odd reason, adding the log statement prevents crashing
+        logging.debug('----')
         # check for the last available tading day on or before the year_closing_date
         last_trading_day_timestamp = max(idx for idx in stock_data.index if idx.date() <= year_closing_date)
         # TODO: check if year_closing_date is null using pd.isnull(last_trading_day)
