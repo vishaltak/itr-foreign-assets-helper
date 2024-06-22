@@ -1,7 +1,13 @@
 import argparse
+import datetime
 import logging
+import re
+import typing
 
 from . import etrade
+from . import forex
+from . import itr
+
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -11,22 +17,60 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+
+if logging.root.level == logging.DEBUG:
+    # following modules create a lot of noise on debug. disable them.
+    logging.getLogger('yfinance').setLevel(logging.WARNING)
+    logging.getLogger('peewee').setLevel(logging.WARNING)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
+
+def validate_financial_year_input(input) -> typing.Tuple[datetime.date, datetime.date]:
+    match = re.match(r'^(\d{4})-(\d{4})$', input)
+    if not match:
+        raise argparse.ArgumentTypeError(f'Invalid financial year format: ${input}. Expected format is YYYY-YYYY.')
+    start_year, end_year = map(int, match.groups())
+    if end_year != start_year + 1:
+        raise argparse.ArgumentTypeError(f'Invalid financial year format: ${input}. Gap between years should only be 1.')
+    financial_year_start_date = datetime.date(year=start_year, month=4, day=1)
+    financial_year_end_year = datetime.date(year=end_year, month=3, day=31)
+    return financial_year_start_date, financial_year_end_year
 
 def main():
     parser = argparse.ArgumentParser(
         prog='itr-foreign-assets-helper',
         description='itr-foreign-assets-helper',
     )
+    parser.add_argument('--financial-year',
+        type=validate_financial_year_input,
+        required=True,
+        help='Financial year for which to generate data. e.g. 2023-2024'    
+    )
+    parser.add_argument('--sbi-reference-rates',
+        type=argparse.FileType('r'),
+        required=False,
+        help='SBI Reference Rates CSV. If not specified, download from https://github.com/sahilgupta/sbi-fx-ratekeeper/blob/main/csv_files/SBI_REFERENCE_RATES_USD.csv'
+    )
     parser.add_argument('--etrade-holdings',
         type=argparse.FileType('rb'),
         required=True,
-        help='ETrade holdings file.')
+        help='ETrade holdings file.'
+    )
     args = parser.parse_args()
 
-    etrade_data = etrade.ETrade()
-    etrade_data.get_shares_issued(holdings_file=args.etrade_holdings)
-    
+    etrade_transcations = etrade.ETradeTransactions(
+        holdings_file=args.etrade_holdings
+    )
+
+    sbi_reference_rates = forex.SBIReferenceRates(args.sbi_reference_rates)
+    itr_schedule_fa_a3 = itr.ScheduleFAA3(
+        stocks_released=etrade_transcations.stocks_released,
+        stocks_sold=etrade_transcations.stocks_sold,
+        sbi_reference_rates=sbi_reference_rates,
+        financial_year=args.financial_year
+    )
+
     logger.info('ITR Data')
-    logger.info('ETrade')
-    logger.info(etrade_data)
+    logger.info('Schedule FA A3')
+    logger.info(itr_schedule_fa_a3.entries)

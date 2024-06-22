@@ -2,7 +2,7 @@
 
 This project is a helper for generating data related to ITR foreign assets.
 
-## Supported platforms
+## Supported brokers
 
 - ETrade
 
@@ -22,7 +22,7 @@ make poetry-install
 make poetry-shell
 ```
 
-### Fetch data
+### Fetch data from broker
 
 #### ETrade
 
@@ -35,5 +35,5 @@ make poetry-shell
 ### Generate data for ITR
 
 ```
-poetry run generate-itr-data --etrade-holdings "<path_to_file>"
+poetry run generate-itr-data --financial-year "2023-2024" --sbi-reference-rates "./data/SBI_REFERENCE_RATES_USD.csv" --etrade-holdings "<path_to_file>"
 ```
