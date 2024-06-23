@@ -63,12 +63,12 @@ class ShareReleasedRecord(ShareRecord):
         comments: str,
         ticker: str,
         award_number: int,
-        shares_issued: int,
+        shares_released: int,
         release_date: datetime.date,
         market_value_per_share: float,
     ) -> None:
         super().__init__(source_metadata, broker, comments, ticker, award_number)
-        self.shares_issued = shares_issued
+        self.shares_released = shares_released
         self.release_date = release_date
         self.market_value_per_share = market_value_per_share
     

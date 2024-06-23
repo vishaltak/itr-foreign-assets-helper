@@ -72,8 +72,8 @@ def main():
     sbi_reference_rates = forex.SBIReferenceRates(args.sbi_reference_rates)
 
     itr_schedule_fa_a3 = itr_schedule_fa.ScheduleFAA3(
-        stocks_released=etrade_transcations.stocks_released,
-        stocks_sold=etrade_transcations.stocks_sold,
+        shares_released=etrade_transcations.shares_released,
+        shares_sold=etrade_transcations.shares_sold,
         sbi_reference_rates=sbi_reference_rates,
         financial_year=args.financial_year
     )

@@ -73,6 +73,7 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
             sbi_reference_rates: forex.SBIReferenceRates,
             financial_year: typing.Tuple[datetime.date, datetime.date],
     ) -> None:
+        # TODO: move this entire logic to the stock classes
         super().__init__()
         self.source_metadata = stock.source_metadata
         self.broker = stock.broker
@@ -83,7 +84,7 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         self.peak_closing_high_date = None
         self.peak_closing_high_value = None
         # following attributes are set in __set_release_date_metadata()
-        self.shares_issued = None
+        self.shares_released = None
         self.release_date = None
         self.market_value_per_share = None
         self.release_date_adjusted_for_tt_buy_rate = None
@@ -108,7 +109,7 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
 
         # depending on the tranction_type of the stock, set the approrpriate attributes.
         if self.transaction_type == 'released':
-            self.shares_issued = stock.shares_issued
+            self.shares_released = stock.shares_released
             self.__set_release_date_metadata(stock=stock, sbi_reference_rates=sbi_reference_rates)
             self.__set_year_end_metadata(sbi_reference_rates=sbi_reference_rates, financial_year=financial_year)
             # for financial year 2023-2024, the end_date to consider for peak closing for
@@ -117,9 +118,9 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
             self.__set_peak_date_metadata(start_date=self.release_date, end_date=self.year_closing_date, sbi_reference_rates=sbi_reference_rates)
             # the final fields that are required while filing the ITR
             self.date_of_acquiring_interest = self.release_date
-            self.initial_value_of_investment = self.shares_issued * self.market_value_per_share * self.tt_buy_rate_for_release_date.tt_buy_exchange_rate
-            self.peak_value_of_investment_during_period = self.shares_issued * self.peak_closing_high_value * self.tt_buy_rate_for_peak_closing_high_date.tt_buy_exchange_rate
-            self.closing_value = self.shares_issued * self.market_value_per_share_on_year_closing_date * self.tt_buy_rate_for_year_closing_date.tt_buy_exchange_rate
+            self.initial_value_of_investment = self.shares_released * self.market_value_per_share * self.tt_buy_rate_for_release_date.tt_buy_exchange_rate
+            self.peak_value_of_investment_during_period = self.shares_released * self.peak_closing_high_value * self.tt_buy_rate_for_peak_closing_high_date.tt_buy_exchange_rate
+            self.closing_value = self.shares_released * self.market_value_per_share_on_year_closing_date * self.tt_buy_rate_for_year_closing_date.tt_buy_exchange_rate
             # since there is no dividend being paid, it is set to 0.0
             self.total_gross_amount_paid_or_credited_to_account_during_period = 0.0
             # since there is no sale and thus no proceed, it is set to 0.0
@@ -222,23 +223,23 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
 class ScheduleFAA3:
     def __init__(
         self,
-        stocks_released: typing.List[stock.ShareReleasedRecord],
-        stocks_sold: typing.List[stock.ShareSoldRecord],
+        shares_released: typing.List[stock.ShareReleasedRecord],
+        shares_sold: typing.List[stock.ShareSoldRecord],
         sbi_reference_rates: typing.Dict[datetime.date, forex.SBIReferenceRatesRecord],
         financial_year: typing.Tuple[datetime.date, datetime.date],
     ) -> None:
         super().__init__()
         self.entries = self.__get_entries(
-            stocks_released=stocks_released,
-            stocks_sold=stocks_sold,
+            shares_released=shares_released,
+            shares_sold=shares_sold,
             sbi_reference_rates=sbi_reference_rates,
             financial_year=financial_year
         )
     
     def __get_entries(
         self,
-        stocks_released: typing.List[stock.ShareReleasedRecord],
-        stocks_sold: typing.List[stock.ShareSoldRecord],
+        shares_released: typing.List[stock.ShareReleasedRecord],
+        shares_sold: typing.List[stock.ShareSoldRecord],
         sbi_reference_rates: typing.Dict[datetime.date, forex.SBIReferenceRatesRecord],
         financial_year: typing.Tuple[datetime.date, datetime.date],
     ) -> typing.List[ScheduleFAA3Record]:
@@ -246,24 +247,24 @@ class ScheduleFAA3:
         # for schedule FA, the timeframe to consider is 1 January to 31 December.
         year_start_date = datetime.date(year=financial_year[0].year, month=1, day=1)
         year_closing_date = datetime.date(year=financial_year[0].year, month=12, day=31)
-        for stock_released in stocks_released:
+        for share_released in shares_released:
             # ignore stocks release after year_closing_date since it is outisde the timeframe we are interested in.
-            if stock_released.release_date > year_closing_date:
-                logger.info(f'Skipping stock released on {stock_released.release_date} for award number {stock_released.award_number} on {stock_released.broker} since it has occured after {year_closing_date}')
+            if share_released.release_date > year_closing_date:
+                logger.info(f'Skipping stock released on {share_released.release_date} for award number {share_released.award_number} on {share_released.broker} since it has occured after {year_closing_date}')
                 continue
             entries.append(ScheduleFAA3Record(
-                stock=stock_released,
+                stock=share_released,
                 sbi_reference_rates=sbi_reference_rates,
                 financial_year=financial_year,
             ))
-        for stock_sold in stocks_sold:
+        for share_sold in shares_sold:
             # ignore stocks sold before year_start_date since it is outisde the timeframe we are interested in.
             # should not compare the release date for these stocks with year_end_date because the stocks can be bought at any time in the past.
-            if stock_sold.sale_date < year_start_date:
-                logger.info(f'Skipping stock sold on {stock_sold.sale_date} for award number {stock_sold.award_number} on {stock_sold.broker} since it has occured before {year_start_date}')
+            if share_sold.sale_date < year_start_date:
+                logger.info(f'Skipping stock sold on {share_sold.sale_date} for award number {share_sold.award_number} on {share_sold.broker} since it has occured before {year_start_date}')
                 continue
             entries.append(ScheduleFAA3Record(
-                stock=stock_sold,
+                stock=share_sold,
                 sbi_reference_rates=sbi_reference_rates,
                 financial_year=financial_year,
             ))

@@ -19,8 +19,8 @@ class ETradeTransactions:
     
     def __init__(self, holdings_file: typing.IO, sale_transactions_file: typing.IO) -> None:
         self.broker = "ETrade"
-        self.stocks_released = self.__get_stocks_released(holdings_file=holdings_file)
-        self.stocks_sold = self.__get_stocks_sold(sale_transactions_file=sale_transactions_file)
+        self.shares_released = self.__get_shares_released(holdings_file=holdings_file)
+        self.shares_sold = self.__get_shares_sold(sale_transactions_file=sale_transactions_file)
         self.cash = self.__get_cash(holdings_file=holdings_file)
     
     def __extract_data(
@@ -59,16 +59,16 @@ class ETradeTransactions:
             curr_row_num += 1
         return data
     
-    def __get_stocks_released(self, holdings_file: typing.IO) -> typing.List[stock.ShareReleasedRecord]:
+    def __get_shares_released(self, holdings_file: typing.IO) -> typing.List[stock.ShareReleasedRecord]:
         sheet_name = 'Sellable'
         required_columns = {
             'Symbol': 'ticker',
-            'Sellable Qty.': 'shares_issued',
+            'Sellable Qty.': 'shares_released',
             'Grant Number': 'award_number',
             'Release Date': 'release_date',
             'Purchase Date FMV': 'market_value_per_share',
         }
-        stocks_released = []
+        share_released_records = []
         # the first row is the column names and hence skipped
         row_to_skip_at_start = 1
         # the last row is the total and hence skipped
@@ -81,21 +81,21 @@ class ETradeTransactions:
             row_to_skip_at_end=row_to_skip_at_end,
         )
         for stock_data in raw_stocks_data:
-            stock_released = stock.ShareReleasedRecord(
+            share_released_record = stock.ShareReleasedRecord(
                 source_metadata=stock_data['source_metadata'],
                 broker=self.broker,
                 comments='',
                 ticker=stock_data['ticker'],
                 award_number=int(stock_data['award_number']),
-                shares_issued=stock_data['shares_issued'],
+                shares_released=stock_data['shares_released'],
                 release_date=datetime.datetime.strptime(stock_data['release_date'], '%d-%b-%Y').date(),
                 market_value_per_share=float(str(stock_data['market_value_per_share']).replace('$', '')),
             )
-            logger.debug(stock_released)
-            stocks_released.append(stock_released)
-        return stocks_released
+            logger.debug(share_released_record)
+            share_released_records.append(share_released_record)
+        return share_released_records
 
-    def __get_stocks_sold(self, sale_transactions_file: typing.IO) -> typing.List[stock.ShareSoldRecord]:
+    def __get_shares_sold(self, sale_transactions_file: typing.IO) -> typing.List[stock.ShareSoldRecord]:
         sheet_name = 'G&L_Expanded'
         required_columns = {
             'Symbol': 'ticker',
@@ -107,7 +107,7 @@ class ETradeTransactions:
             'Proceeds Per Share': 'sale_value_per_share',
             'Order Number': 'sale_order_number'
         }
-        stocks_sold = []
+        share_sold_records = []
         # the first row is the column names and hence skipped
         # the second row is a summary rpw and hence skipped
         row_to_skip_at_start = 2
@@ -121,7 +121,7 @@ class ETradeTransactions:
             row_to_skip_at_end=row_to_skip_at_end,
         )
         for stock_data in raw_stocks_data:
-            stock_sold = stock.ShareSoldRecord(
+            share_sold_record = stock.ShareSoldRecord(
                 source_metadata=stock_data['source_metadata'],
                 broker=self.broker,
                 comments='',
@@ -133,9 +133,9 @@ class ETradeTransactions:
                 sale_date=datetime.datetime.strptime(stock_data['sale_date'], '%m/%d/%Y').date(),
                 sale_value_per_share=float(str(stock_data['sale_value_per_share']).replace('$', '')),
             )
-            logger.debug(stock_sold)
-            stocks_sold.append(stock_sold)
-        return stocks_sold
+            logger.debug(share_sold_record)
+            share_sold_records.append(share_sold_record)
+        return share_sold_records
     
     def __get_cash(self, holdings_file: typing.IO) -> stock.CashRecord:
         sheet_name = 'Other Holdings'
