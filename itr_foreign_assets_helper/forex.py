@@ -72,11 +72,10 @@ class SBIReferenceRates:
         adjusted_date = date
         if adjust_to_last_day_of_previous_month:
             adjusted_date = utils.get_last_day_of_previous_moth(date)
-        adjusted_for_missing_date = False
+        # if the adjusted_date is missing, it will keep subtracting one day till it finds an exchange rate.
         while True:
             if adjusted_date in self.reference_rates_usd:
                 break
-            adjusted_for_missing_date = True
             adjusted_date = adjusted_date - datetime.timedelta(days=1)
         # if no record is found, it will error out
         return adjusted_date, self.reference_rates_usd[adjusted_date]

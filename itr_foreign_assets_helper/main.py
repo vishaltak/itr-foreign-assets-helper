@@ -64,12 +64,15 @@ def main():
     )
     args = parser.parse_args()
 
+    sbi_reference_rates = forex.SBIReferenceRates(args.sbi_reference_rates)
+
     etrade_transcations = etrade.ETradeTransactions(
         holdings_file=args.etrade_holdings,
-        sale_transactions_file=args.etrade_sale_transactions
+        sale_transactions_file=args.etrade_sale_transactions,
+        sbi_reference_rates=sbi_reference_rates,
     )
-
-    sbi_reference_rates = forex.SBIReferenceRates(args.sbi_reference_rates)
+    logger.debug(etrade_transcations.shares_released)
+    logger.debug(etrade_transcations.shares_sold)
 
     itr_schedule_fa_a3 = itr_schedule_fa.ScheduleFAA3(
         shares_released=etrade_transcations.shares_released,

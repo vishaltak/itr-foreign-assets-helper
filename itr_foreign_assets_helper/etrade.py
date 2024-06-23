@@ -8,6 +8,7 @@ import openpyxl.worksheet.worksheet
 
 from pathlib import Path
 
+from . import forex
 from . import stock
 from . import utils
 
@@ -17,8 +18,9 @@ logger = logging.getLogger(__name__)
 
 class ETradeTransactions:
     
-    def __init__(self, holdings_file: typing.IO, sale_transactions_file: typing.IO) -> None:
+    def __init__(self, holdings_file: typing.IO, sale_transactions_file: typing.IO, sbi_reference_rates: forex.SBIReferenceRates) -> None:
         self.broker = "ETrade"
+        self.sbi_reference_rates = sbi_reference_rates
         self.shares_released = self.__get_shares_released(holdings_file=holdings_file)
         self.shares_sold = self.__get_shares_sold(sale_transactions_file=sale_transactions_file)
         self.cash = self.__get_cash(holdings_file=holdings_file)
@@ -82,6 +84,7 @@ class ETradeTransactions:
         )
         for stock_data in raw_stocks_data:
             share_released_record = stock.ShareReleasedRecord(
+                sbi_reference_rates=self.sbi_reference_rates,
                 source_metadata=stock_data['source_metadata'],
                 broker=self.broker,
                 comments='',
@@ -122,6 +125,7 @@ class ETradeTransactions:
         )
         for stock_data in raw_stocks_data:
             share_sold_record = stock.ShareSoldRecord(
+                sbi_reference_rates=self.sbi_reference_rates,
                 source_metadata=stock_data['source_metadata'],
                 broker=self.broker,
                 comments='',
@@ -158,6 +162,7 @@ class ETradeTransactions:
         if len(raw_cash_data) != 1:
             raise Exception(f'Failed to extract cash holdings for {self.broker}')
         cash = stock.CashRecord(
+            sbi_reference_rates=self.sbi_reference_rates,
             source_metadata=raw_cash_data[0]['source_metadata'],
             broker=self.broker,
             comments='',
