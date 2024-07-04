@@ -290,9 +290,10 @@ class ScheduleFAA3:
         year_start_date = datetime.date(year=financial_year[0].year, month=1, day=1)
         year_closing_date = datetime.date(year=financial_year[0].year, month=12, day=31)
         for share_issued in shares_issued:
-            # ignore shares issued after year_closing_date since it is outisde the timeframe we are interested in.
+            # ignore shares issued after year_closing_date since it is outside the timeframe we are interested in for Schedule FA.
+            # do not compare the issue date with the year_start_date since we want to report all holdings we have upto this point regardless of when it was issued.
             if share_issued.issue_date.actual_date > year_closing_date:
-                logger.info(f'Skipping share issued on {share_issued.issue_date} for award number {share_issued.award_number} on {share_issued.broker} since it has occured after {year_closing_date}')
+                logger.info(f'Skipping share issued on {share_issued.issue_date.actual_date} for award number {share_issued.award_number} on {share_issued.broker} since the issue date is outside of {year_start_date} to {year_closing_date}')
                 continue
             entries.append(ScheduleFAA3Record(
                 share_record=share_issued,
@@ -300,10 +301,13 @@ class ScheduleFAA3:
                 financial_year=financial_year,
             ))
         for share_sold in shares_sold:
-            # ignore shares sold before year_start_date since it is outisde the timeframe we are interested in.
-            # should not compare the issue date for these shares with year_end_date because the shares can be bought at any time in the past.
+            # ignore shares sold before year_start_date since it is outside the timeframe we are interested in for Schedule FA.
             if share_sold.sale_date.actual_date < year_start_date:
-                logger.info(f'Skipping share sold on {share_sold.sale_date} for award number {share_sold.award_number} on {share_sold.broker} since it has occured before {year_start_date}')
+                logger.info(f'Skipping share issued on {share_sold.issue_date.actual_date} which was sold on {share_sold.sale_date.actual_date} for award number {share_sold.award_number} on {share_sold.broker} since the sale date is outside of {year_start_date} to {year_closing_date}')
+                continue
+            # ignore shares issued after year_closing_date since it is outside the timeframe we are interested in for Schedule FA.
+            if share_sold.issue_date.actual_date > year_closing_date:
+                logger.info(f'Skipping share issued on {share_sold.issue_date.actual_date} which was sold on {share_sold.sale_date.actual_date} for award number {share_sold.award_number} on {share_sold.broker} since the issue date is outside of {year_start_date} to {year_closing_date}')
                 continue
             entries.append(ScheduleFAA3Record(
                 share_record=share_sold,
