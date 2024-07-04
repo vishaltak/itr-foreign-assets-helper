@@ -4,6 +4,10 @@ import logging
 import re
 import typing
 
+import openpyxl
+
+from pathlib import Path
+
 from . import etrade
 from . import forex
 from . import itr_schedule_fa
@@ -87,13 +91,21 @@ def main():
         financial_year=args.financial_year
     )
 
+    workbook = openpyxl.Workbook()
+    workbook.remove(workbook.active)
     logger.info('ITR Data')
 
     logger.info('Schedule FA A3')
     logger.info(itr_schedule_fa_a3.entries)
+    sheet_name = 'Schedule FA A3'
+    workbook.create_sheet(title=sheet_name)
+    itr_schedule_fa_a3.export(workbook=workbook, sheet_name=sheet_name)
     
-    logger.info('Schedule FA A3 Export')
-    logger.info(itr_schedule_fa_a3.export())
-
     logger.info('Schedule FA A2')
     logger.info(itr_schedule_fa_a2.entries)
+
+    file_name = f'itr-helper-fy-{args.financial_year[0].year}-{args.financial_year[1].year}.xlsx'
+    file_path = Path(__file__).resolve().parent.parent / 'output' / file_name
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    workbook.save(file_path)
+    workbook.close()

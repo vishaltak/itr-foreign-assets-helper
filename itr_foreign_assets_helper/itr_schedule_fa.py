@@ -1,7 +1,10 @@
 import datetime
 import logging
+import json
 import typing
 
+import openpyxl
+import openpyxl.workbook
 import yfinance
 
 from . import forex
@@ -204,7 +207,7 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
     
     def export(self):
         return {
-            'Source Metadata': self.share_record.source_metadata,
+            'Source Metadata': json.dumps(self.share_record.source_metadata),
             'Comments': self.share_record.comments,
             'Transaction Type': self.share_record.transaction_type,
             'Award Number': self.share_record.award_number,
@@ -286,7 +289,13 @@ class ScheduleFAA3:
         return entries
 
     
-    def export(self):
-        # TODO: take a workbook and sheet_name as argument and write data into it with colour coding and formatting
+    def export(self, workbook: openpyxl.Workbook, sheet_name: str) -> openpyxl.Workbook:
+        ws = workbook[sheet_name]
+        title_added = False
         for entry in self.entries:
-            logger.info(entry.export())
+            data = entry.export()
+            if not title_added:
+                ws.append(list(data.keys()))
+                title_added = True
+            ws.append(list(data.values()))
+        return workbook
