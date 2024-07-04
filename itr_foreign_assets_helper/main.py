@@ -71,11 +71,11 @@ def main():
         sale_transactions_file=args.etrade_sale_transactions,
         sbi_reference_rates=sbi_reference_rates,
     )
-    logger.debug(etrade_transcations.shares_released)
+    logger.debug(etrade_transcations.shares_issued)
     logger.debug(etrade_transcations.shares_sold)
 
     itr_schedule_fa_a3 = itr_schedule_fa.ScheduleFAA3(
-        shares_released=etrade_transcations.shares_released,
+        shares_issued=etrade_transcations.shares_issued,
         shares_sold=etrade_transcations.shares_sold,
         sbi_reference_rates=sbi_reference_rates,
         financial_year=args.financial_year
@@ -91,6 +91,9 @@ def main():
 
     logger.info('Schedule FA A3')
     logger.info(itr_schedule_fa_a3.entries)
+    
+    logger.info('Schedule FA A3 Export')
+    logger.info(itr_schedule_fa_a3.export())
 
     logger.info('Schedule FA A2')
     logger.info(itr_schedule_fa_a2.entries)

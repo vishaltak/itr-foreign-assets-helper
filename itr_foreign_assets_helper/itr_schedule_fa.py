@@ -7,6 +7,7 @@ import yfinance
 from . import forex
 from . import itr
 from . import stock
+from . import utils
 
 
 logger = logging.getLogger(__name__)
@@ -85,13 +86,13 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         # peak closing
         end_date_to_consider_for_peak_value = self.__get_end_date_to_consider_for_peak_value()
         self.peak_closing_high_date, self.peak_closing_high_value = self.__get_share_peak_closing_data(
-            start_date=self.share_record.release_date.actual_date,
+            start_date=self.share_record.issue_date.actual_date,
             end_date=end_date_to_consider_for_peak_value
         )
 
         # year end
         acutal_year_closing_date = datetime.date(year=financial_year[0].year, month=12, day=31)
-        self.year_closing_date, self.market_value_per_share_on_year_closing_date = self.__get_share_year_closing_data(year_closing_date=acutal_year_closing_date)
+        self.year_closing_date, self.fmv_per_share_on_year_closing_date = self.__get_share_year_closing_data(year_closing_date=acutal_year_closing_date)
 
         # itr fields
         self.date_of_acquiring_interest = self.__get_date_of_acquiring_interest()
@@ -147,25 +148,25 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         return last_trading_date, last_trading_day_close_price
 
     def __get_date_of_acquiring_interest(self) -> datetime.date:
-        return self.share_record.release_date.actual_date
+        return self.share_record.issue_date.actual_date
     
     def __get_initial_value_of_investment(self) -> float:
         num_of_shares = None
         if self.share_record.transaction_type == 'released':
-            num_of_shares = self.share_record.shares_released
+            num_of_shares = self.share_record.shares_issued
         elif self.share_record.transaction_type == 'sold':
             num_of_shares = self.share_record.shares_sold
         else:
             raise ValueError(f'Invalid transaction type for the share: {self.share_record.transaction_type}')
         
         return num_of_shares * \
-            self.share_record.market_value_per_share * \
-            self.share_record.release_date.sbi_reference_rate.tt_buy_exchange_rate
+            self.share_record.fmv_per_share_on_issue_date * \
+            self.share_record.issue_date.sbi_reference_rate.tt_buy_exchange_rate
     
     def __get_peak_value_of_investment(self) -> float:
         num_of_shares = None
         if self.share_record.transaction_type == 'released':
-            num_of_shares = self.share_record.shares_released
+            num_of_shares = self.share_record.shares_issued
         elif self.share_record.transaction_type == 'sold':
             num_of_shares = self.share_record.shares_sold
         else:
@@ -177,8 +178,8 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
     
     def __get_closing_value(self) -> float:
         if self.share_record.transaction_type == 'released':
-            return self.share_record.shares_released * \
-                self.market_value_per_share_on_year_closing_date * \
+            return self.share_record.shares_issued * \
+                self.fmv_per_share_on_year_closing_date * \
                 self.year_closing_date.sbi_reference_rate.tt_buy_exchange_rate
         elif self.share_record.transaction_type == 'sold':
             # since the share is sold before the year closing date, it will be 0
@@ -196,23 +197,55 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
             return 0.0
         elif self.share_record.transaction_type == 'sold':
             return self.share_record.shares_sold * \
-                self.share_record.sale_value_per_share * \
+                self.share_record.fmv_per_share_on_sale_date * \
                 self.share_record.sale_date.sbi_reference_rate.tt_buy_exchange_rate
         else:
             raise ValueError(f'Invalid transaction type for the share: {self.share_record.transaction_type}')
+    
+    def export(self):
+        return {
+            'Source Metadata': self.share_record.source_metadata,
+            'Comments': self.share_record.comments,
+            'Transaction Type': self.share_record.transaction_type,
+            'Award Number': self.share_record.award_number,
+            'Shares Issued': utils.rercursive_getattr(self.share_record, 'shares_issued', None),
+            'Shares Sold': utils.rercursive_getattr(self.share_record, 'shares_sold', None),
+            'Issue Date': self.share_record.issue_date.actual_date,
+            'FMV Per Share on Issue Date': self.share_record.fmv_per_share_on_issue_date,
+            'TT Buy Rate Date Considered for Issue Date': self.share_record.issue_date.adjusted_date_for_sbi_reference_rate,
+            'TT Buy Rate Considered for Issue Date': self.share_record.issue_date.sbi_reference_rate.tt_buy_exchange_rate,
+            'Sale Date': utils.rercursive_getattr(self.share_record, 'sale_date.actual_date', None),
+            'FMV Per Share on Sale Date': utils.rercursive_getattr(self.share_record, 'fmv_per_share_on_sale_date', None),
+            'TT Buy Rate Date Considered for Sale Date': utils.rercursive_getattr(self.share_record, 'sale_date.adjusted_date_for_sbi_reference_rate', None),
+            'TT Buy Rate Considered for Sale Date': utils.rercursive_getattr(self.share_record, 'sale_date.sbi_reference_rate.tt_buy_exchange_rate', None),
+            'Peak Closing High Date': self.peak_closing_high_date.actual_date,
+            'Peak Closing High Value': self.peak_closing_high_value,
+            'TT Buy Rate Date Considered for Peak Closing High Date': self.peak_closing_high_date.adjusted_date_for_sbi_reference_rate,
+            'TT Buy Rate Considered for Peak Closing High Date': self.peak_closing_high_date.sbi_reference_rate.tt_buy_exchange_rate,
+            'Year Closing Date': self.year_closing_date.actual_date,
+            'FMV Per Share on Year Closing Date': self.fmv_per_share_on_year_closing_date,
+            'TT Buy Rate Date Considered for Year Closing Date': self.year_closing_date.adjusted_date_for_sbi_reference_rate,
+            'TT Buy Rate Considered for Year Closing Date': self.year_closing_date.sbi_reference_rate.tt_buy_exchange_rate,
+            'Date of Acquiring Interest': self.date_of_acquiring_interest,
+            'Initial Value of Investment': self.initial_value_of_investment,
+            'Peak Value of Investment': self.peak_value_of_investment,
+            'Closing Value': self.closing_value,
+            'Total gross amount paid/credited with respect to the holding during the period': self.total_gross_amount_paid_or_credited_with_respect_to_holding_during_period,
+            'Total gross proceeds from sale or redemption of investment during the period': self.total_proceeds_from_sale_or_redemption_of_investment_during_period,
+        }
 
 
 class ScheduleFAA3:
     def __init__(
         self,
-        shares_released: typing.List[stock.ShareReleasedRecord],
+        shares_issued: typing.List[stock.ShareIssuedRecord],
         shares_sold: typing.List[stock.ShareSoldRecord],
         sbi_reference_rates: typing.Dict[datetime.date, forex.SBIReferenceRatesRecord],
         financial_year: typing.Tuple[datetime.date, datetime.date],
     ) -> None:
         super().__init__()
         self.entries = self.__get_entries(
-            shares_released=shares_released,
+            shares_issued=shares_issued,
             shares_sold=shares_sold,
             sbi_reference_rates=sbi_reference_rates,
             financial_year=financial_year
@@ -220,7 +253,7 @@ class ScheduleFAA3:
     
     def __get_entries(
         self,
-        shares_released: typing.List[stock.ShareReleasedRecord],
+        shares_issued: typing.List[stock.ShareIssuedRecord],
         shares_sold: typing.List[stock.ShareSoldRecord],
         sbi_reference_rates: typing.Dict[datetime.date, forex.SBIReferenceRatesRecord],
         financial_year: typing.Tuple[datetime.date, datetime.date],
@@ -229,19 +262,19 @@ class ScheduleFAA3:
         # for schedule FA, the timeframe to consider is 1 January to 31 December.
         year_start_date = datetime.date(year=financial_year[0].year, month=1, day=1)
         year_closing_date = datetime.date(year=financial_year[0].year, month=12, day=31)
-        for share_released in shares_released:
+        for share_issued in shares_issued:
             # ignore shares release after year_closing_date since it is outisde the timeframe we are interested in.
-            if share_released.release_date.actual_date > year_closing_date:
-                logger.info(f'Skipping share released on {share_released.release_date} for award number {share_released.award_number} on {share_released.broker} since it has occured after {year_closing_date}')
+            if share_issued.issue_date.actual_date > year_closing_date:
+                logger.info(f'Skipping share issued on {share_issued.issue_date} for award number {share_issued.award_number} on {share_issued.broker} since it has occured after {year_closing_date}')
                 continue
             entries.append(ScheduleFAA3Record(
-                share_record=share_released,
+                share_record=share_issued,
                 sbi_reference_rates=sbi_reference_rates,
                 financial_year=financial_year,
             ))
         for share_sold in shares_sold:
             # ignore shares sold before year_start_date since it is outisde the timeframe we are interested in.
-            # should not compare the release date for these shares with year_end_date because the shares can be bought at any time in the past.
+            # should not compare the issue date for these shares with year_end_date because the shares can be bought at any time in the past.
             if share_sold.sale_date.actual_date < year_start_date:
                 logger.info(f'Skipping share sold on {share_sold.sale_date} for award number {share_sold.award_number} on {share_sold.broker} since it has occured before {year_start_date}')
                 continue
@@ -251,3 +284,9 @@ class ScheduleFAA3:
                 financial_year=financial_year,
             ))
         return entries
+
+    
+    def export(self):
+        # TODO: take a workbook and sheet_name as argument and write data into it with colour coding and formatting
+        for entry in self.entries:
+            logger.info(entry.export())

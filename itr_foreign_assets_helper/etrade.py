@@ -21,7 +21,7 @@ class ETradeTransactions:
     def __init__(self, holdings_file: typing.IO, sale_transactions_file: typing.IO, sbi_reference_rates: forex.SBIReferenceRates) -> None:
         self.broker = "ETrade"
         self.sbi_reference_rates = sbi_reference_rates
-        self.shares_released = self.__get_shares_released(holdings_file=holdings_file)
+        self.shares_issued = self.__get_shares_issued(holdings_file=holdings_file)
         self.shares_sold = self.__get_shares_sold(sale_transactions_file=sale_transactions_file)
         self.cash = self.__get_cash(holdings_file=holdings_file)
     
@@ -61,16 +61,16 @@ class ETradeTransactions:
             curr_row_num += 1
         return data
     
-    def __get_shares_released(self, holdings_file: typing.IO) -> typing.List[stock.ShareReleasedRecord]:
+    def __get_shares_issued(self, holdings_file: typing.IO) -> typing.List[stock.ShareIssuedRecord]:
         sheet_name = 'Sellable'
         required_columns = {
             'Symbol': 'ticker',
-            'Sellable Qty.': 'shares_released',
+            'Sellable Qty.': 'shares_issued',
             'Grant Number': 'award_number',
-            'Release Date': 'release_date',
-            'Purchase Date FMV': 'market_value_per_share',
+            'Release Date': 'issue_date',
+            'Purchase Date FMV': 'fmv_per_share_on_issue_date',
         }
-        share_released_records = []
+        share_issued_records = []
         # the first row is the column names and hence skipped
         row_to_skip_at_start = 1
         # the last row is the total and hence skipped
@@ -83,20 +83,20 @@ class ETradeTransactions:
             row_to_skip_at_end=row_to_skip_at_end,
         )
         for stock_data in raw_stocks_data:
-            share_released_record = stock.ShareReleasedRecord(
+            share_issued_record = stock.ShareIssuedRecord(
                 sbi_reference_rates=self.sbi_reference_rates,
                 source_metadata=stock_data['source_metadata'],
                 broker=self.broker,
                 comments='',
                 ticker=stock_data['ticker'],
                 award_number=int(stock_data['award_number']),
-                shares_released=stock_data['shares_released'],
-                release_date=datetime.datetime.strptime(stock_data['release_date'], '%d-%b-%Y').date(),
-                market_value_per_share=float(str(stock_data['market_value_per_share']).replace('$', '')),
+                shares_issued=stock_data['shares_issued'],
+                issue_date=datetime.datetime.strptime(stock_data['issue_date'], '%d-%b-%Y').date(),
+                fmv_per_share_on_issue_date=float(str(stock_data['fmv_per_share_on_issue_date']).replace('$', '')),
             )
-            logger.debug(share_released_record)
-            share_released_records.append(share_released_record)
-        return share_released_records
+            logger.debug(share_issued_record)
+            share_issued_records.append(share_issued_record)
+        return share_issued_records
 
     def __get_shares_sold(self, sale_transactions_file: typing.IO) -> typing.List[stock.ShareSoldRecord]:
         sheet_name = 'G&L_Expanded'
@@ -104,10 +104,10 @@ class ETradeTransactions:
             'Symbol': 'ticker',
             'Qty.': 'shares_sold',
             'Grant Number': 'award_number',
-            'Date Acquired': 'release_date',
-            'Vest Date FMV': 'market_value_per_share',
+            'Date Acquired': 'issue_date',
+            'Vest Date FMV': 'fmv_per_share_on_issue_date',
             'Date Sold': 'sale_date',
-            'Proceeds Per Share': 'sale_value_per_share',
+            'Proceeds Per Share': 'fmv_per_share_on_sale_date',
             'Order Number': 'sale_order_number'
         }
         share_sold_records = []
@@ -131,11 +131,11 @@ class ETradeTransactions:
                 comments='',
                 ticker=stock_data['ticker'],
                 award_number=int(stock_data['award_number']),
-                release_date=datetime.datetime.strptime(stock_data['release_date'], '%m/%d/%Y').date(),
-                market_value_per_share=float(str(stock_data['market_value_per_share']).replace('$', '')),
+                issue_date=datetime.datetime.strptime(stock_data['issue_date'], '%m/%d/%Y').date(),
+                fmv_per_share_on_issue_date=float(str(stock_data['fmv_per_share_on_issue_date']).replace('$', '')),
                 shares_sold=stock_data['shares_sold'],
                 sale_date=datetime.datetime.strptime(stock_data['sale_date'], '%m/%d/%Y').date(),
-                sale_value_per_share=float(str(stock_data['sale_value_per_share']).replace('$', '')),
+                fmv_per_share_on_sale_date=float(str(stock_data['fmv_per_share_on_sale_date']).replace('$', '')),
             )
             logger.debug(share_sold_record)
             share_sold_records.append(share_sold_record)

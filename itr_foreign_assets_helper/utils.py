@@ -1,4 +1,5 @@
 import datetime
+import functools
 import openpyxl
 import typing
 
@@ -14,3 +15,14 @@ def get_ws_column_metadata(ws: openpyxl.worksheet.worksheet.Worksheet, columns: 
 
 def get_last_day_of_previous_moth(date: datetime.date) -> datetime.date:
     return date.replace(day=1) - datetime.timedelta(days=1)
+
+
+# Source - https://stackoverflow.com/a/31174427
+def rercursive_setattr(obj, attr, val):
+    pre, _, post = attr.rpartition('.')
+    return setattr(rercursive_getattr(obj, pre) if pre else obj, post, val)
+
+def rercursive_getattr(obj, attr, *args):
+    def _getattr(obj, attr):
+        return getattr(obj, attr, *args)
+    return functools.reduce(_getattr, [obj] + attr.split('.'))

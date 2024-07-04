@@ -20,7 +20,7 @@ class Date:
         self.type = type
         self.actual_date = date
         adjust_to_last_day_of_previous_month = None
-        if self.type == 'release_date':
+        if self.type == 'issue_date':
             adjust_to_last_day_of_previous_month = True
         elif self.type == 'sale_date':
             adjust_to_last_day_of_previous_month = True
@@ -100,7 +100,7 @@ class ShareRecord:
         return f'{self.__class__.__name__}({attrs})'
 
 
-class ShareReleasedRecord(ShareRecord):
+class ShareIssuedRecord(ShareRecord):
 
     def __init__(
         self,
@@ -110,14 +110,14 @@ class ShareReleasedRecord(ShareRecord):
         comments: str,
         ticker: str,
         award_number: int,
-        shares_released: int,
-        release_date: datetime.date,
-        market_value_per_share: float,
+        shares_issued: int,
+        issue_date: datetime.date,
+        fmv_per_share_on_issue_date: float,
     ) -> None:
         super().__init__(sbi_reference_rates, source_metadata, broker, comments, ticker, award_number)
-        self.shares_released = shares_released
-        self.release_date = Date(date=release_date, type='release_date', sbi_reference_rates=self.sbi_reference_rates)
-        self.market_value_per_share = market_value_per_share
+        self.shares_issued = shares_issued
+        self.issue_date = Date(date=issue_date, type='issue_date', sbi_reference_rates=self.sbi_reference_rates)
+        self.fmv_per_share_on_issue_date = fmv_per_share_on_issue_date
     
     @property
     def transaction_type(self):
@@ -133,18 +133,18 @@ class ShareSoldRecord(ShareRecord):
         comments: str,
         ticker: str,
         award_number: int,
-        release_date: datetime.date,
-        market_value_per_share: float,
+        issue_date: datetime.date,
+        fmv_per_share_on_issue_date: float,
         shares_sold: int,
         sale_date: datetime.date,
-        sale_value_per_share: float,
+        fmv_per_share_on_sale_date: float,
     ) -> None:
         super().__init__(sbi_reference_rates, source_metadata, broker, comments, ticker, award_number)
-        self.release_date = Date(date=release_date, type='release_date', sbi_reference_rates=self.sbi_reference_rates)
-        self.market_value_per_share = market_value_per_share
+        self.issue_date = Date(date=issue_date, type='issue_date', sbi_reference_rates=self.sbi_reference_rates)
+        self.fmv_per_share_on_issue_date = fmv_per_share_on_issue_date
         self.shares_sold = shares_sold
         self.sale_date = Date(date=sale_date, type='sale_date', sbi_reference_rates=self.sbi_reference_rates)
-        self.sale_value_per_share = sale_value_per_share
+        self.fmv_per_share_on_sale_date = fmv_per_share_on_sale_date
     
     @property
     def transaction_type(self):
