@@ -86,7 +86,7 @@ def main():
     )
 
     itr_schedule_fa_a2 = itr_schedule_fa.ScheduleFAA2(
-        cash=etrade_transcations.cash,
+        cash_record=etrade_transcations.cash,
         sbi_reference_rates=sbi_reference_rates,
         financial_year=args.financial_year
     )
@@ -103,6 +103,9 @@ def main():
     
     logger.info('Schedule FA A2')
     logger.info(itr_schedule_fa_a2.entries)
+    sheet_name = 'Schedule FA A2'
+    workbook.create_sheet(title=sheet_name)
+    itr_schedule_fa_a2.export(workbook=workbook, sheet_name=sheet_name)
 
     file_name = f'itr-helper-fy-{args.financial_year[0].year}-{args.financial_year[1].year}.xlsx'
     file_path = Path(__file__).resolve().parent.parent / 'output' / file_name

@@ -19,12 +19,12 @@ logger = logging.getLogger(__name__)
 class ScheduleFAA2Record(itr.ScheduleRecord):
     def __init__(
             self,
-            cash: stock.CashRecord,
+            cash_record: stock.CashRecord,
             sbi_reference_rates: forex.SBIReferenceRates,
             financial_year: typing.Tuple[datetime.date, datetime.date],
     ) -> None:
         super().__init__()
-        self.cash = cash
+        self.cash_record = cash_record
         self.sbi_reference_rates = sbi_reference_rates
         self.financial_year = financial_year
 
@@ -34,44 +34,67 @@ class ScheduleFAA2Record(itr.ScheduleRecord):
         
         # TODO: need to think about this more
         # the final fields that are required while filing the ITR
-        self.peak_balance_during_period = self.cash.amount * \
+        self.peak_balance_during_period = self.cash_record.amount * \
             self.year_closing_date.sbi_reference_rate.tt_buy_exchange_rate
         
-        self.closing_balance = self.cash.amount * \
+        self.closing_balance = self.cash_record.amount * \
             self.year_closing_date.sbi_reference_rate.tt_buy_exchange_rate
         
         self.total_gross_amount_paid_or_credited_to_account_during_period = 0.0
         self.nature_of_income = 'Not Applicable'
+    
+    def export(self) -> dict:
+        return {
+            'Source Metadata': json.dumps(self.cash_record.source_metadata),
+            'Comments': self.cash_record.comments,
+            'Broker': self.cash_record.broker,
+            'Peak balance during the period': self.peak_balance_during_period,
+            'Closing balance': self.closing_balance,
+            'Gross amount paid/credited to the account during the period': self.total_gross_amount_paid_or_credited_to_account_during_period,
+            'Nature of Income': self.nature_of_income,
+        }
 
 
 class ScheduleFAA2:
     def __init__(
         self,
-        cash: stock.CashRecord,
+        cash_record: stock.CashRecord,
         sbi_reference_rates: typing.Dict[datetime.date, forex.SBIReferenceRatesRecord],
         financial_year: typing.Tuple[datetime.date, datetime.date],
     ) -> None:
         super().__init__()
         self.entries = self.__get_entries(
-            cash=cash,
+            cash_record=cash_record,
             sbi_reference_rates=sbi_reference_rates,
             financial_year=financial_year
         )
     
     def __get_entries(
         self,
-        cash: stock.CashRecord,
+        cash_record: stock.CashRecord,
         sbi_reference_rates: typing.Dict[datetime.date, forex.SBIReferenceRatesRecord],
         financial_year: typing.Tuple[datetime.date, datetime.date],
     ) -> typing.List[ScheduleFAA2Record]:
         entries = []
         # for schedule FA, the timeframe to consider is 1 January to 31 December.
         entries.append(ScheduleFAA2Record(
-            cash=cash,
+            cash_record=cash_record,
             sbi_reference_rates=sbi_reference_rates,
             financial_year=financial_year,
         ))
         return entries
+    
+    def export(self, workbook: openpyxl.Workbook, sheet_name: str) -> openpyxl.Workbook:
+        ws = workbook[sheet_name]
+        title_added = False
+        for entry in self.entries:
+            data = entry.export()
+            if not title_added:
+                ws.append(list(data.keys()))
+                title_added = True
+            ws.append(list(data.values()))
+        return workbook
+
 
 
 class ScheduleFAA3Record(itr.ScheduleRecord):
@@ -205,10 +228,11 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         else:
             raise ValueError(f'Invalid transaction type for the share: {self.share_record.transaction_type}')
     
-    def export(self):
+    def export(self) -> dict:
         return {
             'Source Metadata': json.dumps(self.share_record.source_metadata),
             'Comments': self.share_record.comments,
+            'Broker': self.share_record.broker,
             'Transaction Type': self.share_record.transaction_type,
             'Award Number': self.share_record.award_number,
             'Shares Issued': utils.rercursive_getattr(self.share_record, 'shares_issued', None),
@@ -287,7 +311,6 @@ class ScheduleFAA3:
                 financial_year=financial_year,
             ))
         return entries
-
     
     def export(self, workbook: openpyxl.Workbook, sheet_name: str) -> openpyxl.Workbook:
         ws = workbook[sheet_name]
