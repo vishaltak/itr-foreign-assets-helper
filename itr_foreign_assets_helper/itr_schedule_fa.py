@@ -117,8 +117,8 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         )
 
         # year end
-        acutal_year_closing_date = datetime.date(year=financial_year[0].year, month=12, day=31)
-        self.year_closing_date, self.fmv_per_share_on_year_closing_date = self.__get_share_year_closing_data(year_closing_date=acutal_year_closing_date)
+        self.year_closing_date = stock.Date(date=datetime.date(year=financial_year[0].year, month=12, day=31), type='year_closing_date', sbi_reference_rates=self.sbi_reference_rates)
+        self.last_trading_date, self.fmv_per_share_on_last_trading_date = self.__get_share_year_closing_data(year_closing_date=self.year_closing_date.actual_date)
 
         # itr fields
         self.date_of_acquiring_interest = self.__get_date_of_acquiring_interest()
@@ -151,7 +151,7 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         highest_close_date = stock.Date(date=highest_close_date_timestamp.date(), type='peak_closing_high_date', sbi_reference_rates=self.sbi_reference_rates)
         return highest_close_date, highest_close_price
 
-    def __get_share_year_closing_data(self, year_closing_date: datetime.date) -> typing.Tuple[stock.Date, float]:
+    def __get_share_year_closing_data(self, year_closing_date: datetime.date) -> typing.Tuple[datetime.date, float]:
         if year_closing_date.day != 31 or year_closing_date.month != 12:
             raise ValueError(f'Invalid date for calculating the market close value at year end for ticker: {year_closing_date} . Example vlaues would be 2023-12-31')
         # the market can be closed on the 31 December.
@@ -170,7 +170,8 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         # TODO: check if year_closing_date is null using pd.isnull(last_trading_day)
         # although highly unlikely that the market remained closed for the last 10 days of the year.
         last_trading_day_close_price = share_data.loc[last_trading_day_timestamp, 'Close']
-        last_trading_date = stock.Date(date=last_trading_day_timestamp.date(), type='year_closing_date', sbi_reference_rates=self.sbi_reference_rates)
+        # intentionally not returning stock.Date here since this date should not be used for TT Buy rate
+        last_trading_date = date=last_trading_day_timestamp.date()
         return last_trading_date, last_trading_day_close_price
 
     def __get_date_of_acquiring_interest(self) -> datetime.date:
@@ -204,8 +205,10 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
     
     def __get_closing_value(self) -> float:
         if self.share_record.transaction_type == 'issued':
+            # consider the year closing date for TT Buy rate and not the trading date
+            # because we want the exchange rate on 31 december of the share.
             return self.share_record.shares_issued * \
-                self.fmv_per_share_on_year_closing_date * \
+                self.fmv_per_share_on_last_trading_date * \
                 self.year_closing_date.sbi_reference_rate.tt_buy_exchange_rate
         elif self.share_record.transaction_type == 'sold':
             # since the share is sold before the year closing date, it will be 0
@@ -250,7 +253,8 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
             'TT Buy Rate Date Considered for Peak Closing High Date': self.peak_closing_high_date.adjusted_date_for_sbi_reference_rate,
             'TT Buy Rate Considered for Peak Closing High Date': self.peak_closing_high_date.sbi_reference_rate.tt_buy_exchange_rate,
             'Year Closing Date': self.year_closing_date.actual_date,
-            'FMV Per Share on Year Closing Date': self.fmv_per_share_on_year_closing_date,
+            'Last Trading Date': self.last_trading_date,
+            'FMV Per Share on Last Trading Date': self.fmv_per_share_on_last_trading_date,
             'TT Buy Rate Date Considered for Year Closing Date': self.year_closing_date.adjusted_date_for_sbi_reference_rate,
             'TT Buy Rate Considered for Year Closing Date': self.year_closing_date.sbi_reference_rate.tt_buy_exchange_rate,
             'Date of Acquiring Interest': self.date_of_acquiring_interest,
