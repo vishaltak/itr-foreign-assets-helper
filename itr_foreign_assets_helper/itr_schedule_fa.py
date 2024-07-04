@@ -4,7 +4,6 @@ import json
 import typing
 
 import openpyxl
-import openpyxl.workbook
 import yfinance
 
 from . import forex

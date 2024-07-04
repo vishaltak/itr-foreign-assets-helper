@@ -10,6 +10,8 @@ from pathlib import Path
 
 from . import etrade
 from . import forex
+from . import itr_schedule_al
+from . import itr_schedule_cg
 from . import itr_schedule_fa
 
 
@@ -78,15 +80,27 @@ def main():
     logger.debug(etrade_transcations.shares_issued)
     logger.debug(etrade_transcations.shares_sold)
 
-    itr_schedule_fa_a3 = itr_schedule_fa.ScheduleFAA3(
+    itr_schedule_fa_a3_data = itr_schedule_fa.ScheduleFAA3(
         shares_issued=etrade_transcations.shares_issued,
         shares_sold=etrade_transcations.shares_sold,
         sbi_reference_rates=sbi_reference_rates,
         financial_year=args.financial_year
     )
 
-    itr_schedule_fa_a2 = itr_schedule_fa.ScheduleFAA2(
+    itr_schedule_fa_a2_data = itr_schedule_fa.ScheduleFAA2(
         cash_record=etrade_transcations.cash,
+        sbi_reference_rates=sbi_reference_rates,
+        financial_year=args.financial_year
+    )
+
+    itr_schedule_cg_data = itr_schedule_cg.ScheduleCG(
+        shares_sold=etrade_transcations.shares_sold,
+        sbi_reference_rates=sbi_reference_rates,
+        financial_year=args.financial_year
+    )
+
+    itr_schedule_al_data = itr_schedule_al.ScheduleAL(
+        shares_issued=etrade_transcations.shares_issued,
         sbi_reference_rates=sbi_reference_rates,
         financial_year=args.financial_year
     )
@@ -96,16 +110,28 @@ def main():
     logger.info('ITR Data')
 
     logger.info('Schedule FA A3')
-    logger.info(itr_schedule_fa_a3.entries)
+    logger.info(itr_schedule_fa_a3_data.entries)
     sheet_name = 'Schedule FA A3'
     workbook.create_sheet(title=sheet_name)
-    itr_schedule_fa_a3.export(workbook=workbook, sheet_name=sheet_name)
+    itr_schedule_fa_a3_data.export(workbook=workbook, sheet_name=sheet_name)
     
     logger.info('Schedule FA A2')
-    logger.info(itr_schedule_fa_a2.entries)
+    logger.info(itr_schedule_fa_a2_data.entries)
     sheet_name = 'Schedule FA A2'
     workbook.create_sheet(title=sheet_name)
-    itr_schedule_fa_a2.export(workbook=workbook, sheet_name=sheet_name)
+    itr_schedule_fa_a2_data.export(workbook=workbook, sheet_name=sheet_name)
+
+    logger.info('Schedule CG')
+    logger.info(itr_schedule_cg_data.entries)
+    sheet_name = 'Schedule CG'
+    workbook.create_sheet(title=sheet_name)
+    itr_schedule_cg_data.export(workbook=workbook, sheet_name=sheet_name)
+
+    logger.info('Schedule AL')
+    logger.info(itr_schedule_al_data.entries)
+    sheet_name = 'Schedule AL'
+    workbook.create_sheet(title=sheet_name)
+    itr_schedule_al_data.export(workbook=workbook, sheet_name=sheet_name)
 
     file_name = f'itr-helper-fy-{args.financial_year[0].year}-{args.financial_year[1].year}.xlsx'
     file_path = Path(__file__).resolve().parent.parent / 'output' / file_name
