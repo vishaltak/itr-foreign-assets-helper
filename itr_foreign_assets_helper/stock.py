@@ -121,7 +121,7 @@ class ShareIssuedRecord(ShareRecord):
     
     @property
     def transaction_type(self):
-        return 'released'
+        return 'issued'
 
 
 class ShareSoldRecord(ShareRecord):

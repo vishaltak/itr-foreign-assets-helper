@@ -103,7 +103,7 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         self.total_proceeds_from_sale_or_redemption_of_investment_during_period = self.__get_total_proceeds_from_sale_or_redemption_of_investment_during_period()
 
     def __get_end_date_to_consider_for_peak_value(self) -> datetime.date:
-        if self.share_record.transaction_type == 'released':
+        if self.share_record.transaction_type == 'issued':
             # since the share hasn't been sold, use the year end date - 31 december
             # since Schedule FA manages data from 1 January to 31 December
             return datetime.date(self.financial_year[0].year, month=12, day=31)
@@ -152,7 +152,7 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
     
     def __get_initial_value_of_investment(self) -> float:
         num_of_shares = None
-        if self.share_record.transaction_type == 'released':
+        if self.share_record.transaction_type == 'issued':
             num_of_shares = self.share_record.shares_issued
         elif self.share_record.transaction_type == 'sold':
             num_of_shares = self.share_record.shares_sold
@@ -165,7 +165,7 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
     
     def __get_peak_value_of_investment(self) -> float:
         num_of_shares = None
-        if self.share_record.transaction_type == 'released':
+        if self.share_record.transaction_type == 'issued':
             num_of_shares = self.share_record.shares_issued
         elif self.share_record.transaction_type == 'sold':
             num_of_shares = self.share_record.shares_sold
@@ -177,7 +177,7 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
                 self.peak_closing_high_date.sbi_reference_rate.tt_buy_exchange_rate
     
     def __get_closing_value(self) -> float:
-        if self.share_record.transaction_type == 'released':
+        if self.share_record.transaction_type == 'issued':
             return self.share_record.shares_issued * \
                 self.fmv_per_share_on_year_closing_date * \
                 self.year_closing_date.sbi_reference_rate.tt_buy_exchange_rate
@@ -192,7 +192,7 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         return 0.0
     
     def __get_total_proceeds_from_sale_or_redemption_of_investment_during_period(self):
-        if self.share_record.transaction_type == 'released':
+        if self.share_record.transaction_type == 'issued':
             # since the share is not sold, there will be no proceeds and hence it will be 0
             return 0.0
         elif self.share_record.transaction_type == 'sold':
@@ -263,7 +263,7 @@ class ScheduleFAA3:
         year_start_date = datetime.date(year=financial_year[0].year, month=1, day=1)
         year_closing_date = datetime.date(year=financial_year[0].year, month=12, day=31)
         for share_issued in shares_issued:
-            # ignore shares release after year_closing_date since it is outisde the timeframe we are interested in.
+            # ignore shares issued after year_closing_date since it is outisde the timeframe we are interested in.
             if share_issued.issue_date.actual_date > year_closing_date:
                 logger.info(f'Skipping share issued on {share_issued.issue_date} for award number {share_issued.award_number} on {share_issued.broker} since it has occured after {year_closing_date}')
                 continue
