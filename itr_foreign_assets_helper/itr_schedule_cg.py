@@ -8,6 +8,7 @@ import openpyxl
 from . import forex
 from . import itr
 from . import stock
+from . import utils
 
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,17 @@ class ScheduleCGRecord(itr.ScheduleRecord):
             'Source Metadata': json.dumps(self.share_record.source_metadata),
             'Comments': self.share_record.comments,
             'Broker': self.share_record.broker,
+            'Transaction Type': self.share_record.transaction_type,
+            'Award Number': self.share_record.award_number,
+            'Shares Sold': self.share_record.shares_sold,
+            'Issue Date': self.share_record.issue_date.actual_date,
+            'FMV Per Share on Issue Date': self.share_record.fmv_per_share_on_issue_date,
+            'TT Buy Rate Date Considered for Issue Date': self.share_record.issue_date.adjusted_date_for_sbi_reference_rate,
+            'TT Buy Rate Considered for Issue Date': self.share_record.issue_date.sbi_reference_rate.tt_buy_exchange_rate,
+            'Sale Date': self.share_record.sale_date.actual_date,
+            'FMV Per Share on Sale Date': self.share_record.fmv_per_share_on_sale_date,
+            'TT Buy Rate Date Considered for Sale Date': self.share_record.sale_date.adjusted_date_for_sbi_reference_rate,
+            'TT Buy Rate Considered for Sale Date': self.share_record.sale_date.sbi_reference_rate.tt_buy_exchange_rate,
             'Cost of Acquisition without indexation': self.cost_of_acquisition_without_indexation,
             'Cost of Improvment without indexation': self.cost_of_improvment_without_indexation,
             'Expenditure wholly and exclusively in connection with transfer': self.expenditure_wholly_and_exclusively_in_connection_with_transfer,
