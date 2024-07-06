@@ -111,25 +111,19 @@ def main():
 
     logger.info('Schedule FA A3')
     logger.info(itr_schedule_fa_a3_data.entries)
-    sheet_name = 'Schedule FA A3'
+    sheet_name = 'schedule_fa_a3'
     workbook.create_sheet(title=sheet_name)
     itr_schedule_fa_a3_data.export(workbook=workbook, sheet_name=sheet_name)
-    
-    logger.info('Schedule FA A2')
-    logger.info(itr_schedule_fa_a2_data.entries)
-    sheet_name = 'Schedule FA A2'
-    workbook.create_sheet(title=sheet_name)
-    itr_schedule_fa_a2_data.export(workbook=workbook, sheet_name=sheet_name)
 
     logger.info('Schedule CG')
     logger.info(itr_schedule_cg_data.entries)
-    sheet_name = 'Schedule CG'
+    sheet_name = 'schedule_cg'
     workbook.create_sheet(title=sheet_name)
     itr_schedule_cg_data.export(workbook=workbook, sheet_name=sheet_name)
 
     logger.info('Schedule AL')
     logger.info(itr_schedule_al_data.entries)
-    sheet_name = 'Schedule AL'
+    sheet_name = 'schedule_al'
     workbook.create_sheet(title=sheet_name)
     itr_schedule_al_data.export(workbook=workbook, sheet_name=sheet_name)
 
