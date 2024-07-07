@@ -85,12 +85,13 @@ poetry run generate-itr-data --financial-year "2023-2024" --sbi-reference-rates 
 ### FAQs
 
 - How is reporting done for the foreign assets?
-    - Stocks issued issued at any point but held on 31st December are reported in Schedule FA A3.
+    - Stocks issued at any point that are held on 31st December are reported in Schedule FA A3.
         - The script makes an assumption that any stock held upto 31st December is not sold uptil 31st March. This will be addressed soon.
+    - Stocks issued on/after 1st January but sold on/before 31st December are reported in Schedule FA A3.
     - Cash available in broker account on 31st December is reported in Schedule FA A2.
         - [Needs to be done manually](#schedule-fa-a2)
     - Stocks sold from 1st April to 31st March are reported in Schedule CG.
-    - Stocks issued from 1st April to 31st March are reported in Schedule AL.
+    - Stocks issued at any point that are held on 31st March are reported in Schedule AL.
     - Cash available in broker account on 31st March is reported in Schedule AL.
         - [Needs to be done manually](#schedule-al)
 - What exchange rate is being used?
