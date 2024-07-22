@@ -72,8 +72,8 @@ poetry run generate-itr-data --financial-year "2023-2024" --sbi-reference-rates 
 
 - Schedule FA A2 data is not generated from the above script. It need to be done manually.
 - Using the [account statement on 31st December](#account-statement), the following would be the entries for Schedule FA A2
-    - "Peak balance during the period" would be the cash in INR on 31 March. The assumption here is that you have not withdrawn the money. Else, need more thought here.
-    - "Closing balance" would be the cash in INR on 31 March.
+    - "Peak balance during the period" would be the cash in INR on 31 December. The assumption here is that you have not withdrawn the money. Else, need more thought here.
+    - "Closing balance" would be the cash in INR on 31 December.
     - "Gross amount paid/credited to the account during the period" would be 0.
 
 #### Schedule AL
