@@ -87,12 +87,6 @@ def main():
         financial_year=args.financial_year
     )
 
-    itr_schedule_fa_a2_data = itr_schedule_fa.ScheduleFAA2(
-        cash_record=etrade_transcations.cash,
-        sbi_reference_rates=sbi_reference_rates,
-        financial_year=args.financial_year
-    )
-
     itr_schedule_cg_data = itr_schedule_cg.ScheduleCG(
         shares_sold=etrade_transcations.shares_sold,
         sbi_reference_rates=sbi_reference_rates,
