@@ -10,16 +10,18 @@ This project is a helper for generating data related to ITR foreign assets.
 
 ### Install dependencies
 
-Install [poetry](https://github.com/python-poetry/poetry).
+Install [mise](https://mise.jdx.dev/getting-started.html).
+
+Install `poetry`.
+
+```shell
+mise install
+```
+
+Install python packages
 
 ```
-make poetry-install
-```
-
-### Start poetry shell
-
-```
-make poetry-shell
+poetry install
 ```
 
 ### Fetch data from broker
