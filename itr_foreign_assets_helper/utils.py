@@ -10,6 +10,8 @@ def get_ws_column_metadata(ws: openpyxl.worksheet.worksheet.Worksheet, columns: 
         cell = ws.cell(row=1, column=i+1)
         col_name = cell.value
         if col_name in columns:
+            if col_name in letters.values():
+                raise ValueError(f"Duplicate column name '{col_name}' in sheet '{ws}'")
             letters[cell.column_letter] = col_name
     return letters
 

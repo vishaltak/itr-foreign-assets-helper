@@ -64,8 +64,8 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         close_prices = share_data['Close']
         # TODO: for some odd reason, adding the log statement prevents crashing
         logging.debug('----')
-        highest_close_date_timestamp = close_prices.idxmax()
-        highest_close_price = close_prices.max()
+        highest_close_date_timestamp = close_prices.idxmax().iloc[0]
+        highest_close_price = close_prices.max().iloc[0]
         highest_close_date = stock.Date(date=highest_close_date_timestamp.date(), type='peak_closing_high_date', sbi_reference_rates=self.sbi_reference_rates)
         return highest_close_date, highest_close_price
 
@@ -87,9 +87,9 @@ class ScheduleFAA3Record(itr.ScheduleRecord):
         last_trading_day_timestamp = max(idx for idx in share_data.index if idx.date() <= year_closing_date)
         # TODO: check if year_closing_date is null using pd.isnull(last_trading_day)
         # although highly unlikely that the market remained closed for the last 10 days of the year.
-        last_trading_day_close_price = share_data.loc[last_trading_day_timestamp, 'Close']
+        last_trading_day_close_price = share_data.loc[last_trading_day_timestamp, 'Close'].iloc[0]
         # intentionally not returning stock.Date here since this date should not be used for TT Buy rate
-        last_trading_date = date=last_trading_day_timestamp.date()
+        last_trading_date = last_trading_day_timestamp.date()
         return last_trading_date, last_trading_day_close_price
 
     def __get_date_of_acquiring_interest(self) -> datetime.date:

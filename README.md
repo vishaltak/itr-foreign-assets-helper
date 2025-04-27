@@ -64,9 +64,28 @@ make poetry-shell
 
 ### Generate data for ITR
 
+Before running the script, ensure you check the following -
+
+- For [holdings](#holdings) file
+    - If you have downloaded the [holdings](#holdings) file during a trading window,
+        - Rename the `Sellable` sheet to `Blocked`.
+        - Rename the `Sellable` column to `Blocked` in `Blocked` sheet.
+        - Rename the `Sellable Qty.` column to `Blocked Qty.` in `Blocked` sheet.
+    - Verify that while reading the file, we need to skip the 1 row from the beginning and 4 rows at the end because they contain metadata like names, subtotals and totals. If this changes, update the `__get_shares_issued` function in `etrade.py`.
+- For the [gains and losses](#gains-and-losses) file
+    - Ensure the sheet is called `G&L_Expanded`.
+    - Verify that while reading the file, we skip the 2 rows from the beginning and 0 rows at the end because they contain metadata like totals and subtotals. If this changes, update the `__get_shares_sold` function in `etrade.py`.
+- Download the SBI Reference Rates for USD in `./data/SBI_REFERENCE_RATES_USD.csv` folder. This is to avoid downloading the files if you are running this script frequently to debug an issue. If you don't donwload this, skip the `--sbi-reference-rates` argument below and it will download it automatically for you.
+
+Generate the data for Schedule FA A3, Schedule CG and Schedule AL(partially), by running the following command -
+
 ```
-poetry run generate-itr-data --financial-year "2023-2024" --sbi-reference-rates "./data/SBI_REFERENCE_RATES_USD.csv" --etrade-holdings "<path_to_file>" --etrade-sale-transactions "<path_to_file>"
+poetry run generate-itr-data --financial-year "YYYY-YYYY" --sbi-reference-rates "./data/SBI_REFERENCE_RATES_USD.csv" --etrade-holdings "<path_to_holdings_file>" --etrade-sale-transactions "<path_to_gains_and_losses_file>"
 ```
+
+Follow the steps below to populate [Schedule FA A2](#schedule-fa-a2) and [Scehdule AL](#schedule-al).
+
+Ensure you go through the logs to verify everything worked correctly.
 
 #### Schedule FA A2
 
