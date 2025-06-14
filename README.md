@@ -70,13 +70,15 @@ Before running the script, ensure you check the following -
 
 - For [holdings](#holdings) file
     - If you have downloaded the [holdings](#holdings) file during a trading window,
-        - Rename the `Sellable` sheet to `Blocked`.
-        - Rename the `Sellable` column to `Blocked` in `Blocked` sheet.
-        - Rename the `Sellable Qty.` column to `Blocked Qty.` in `Blocked` sheet.
-    - Verify that while reading the file, we need to skip the 1 row from the beginning and 4 rows at the end because they contain metadata like names, subtotals and totals. If this changes, update the `__get_shares_issued` function in `etrade.py`.
+        - Rename the `Blocked` sheet to `Sellable`.
+        - Rename the `Blocked` column to `Sellable` in `Sellable` sheet.
+        - Rename the `Blocked Qty.` column to `Sellable Qty.` in `Sellable` sheet.
+    - Verify that while reading the file, we need to skip the 1 row from the beginning and 1 row at the end because they contain metadata like names, subtotals and totals. If this changes, update the `__get_shares_issued` function in `etrade.py`.
+    - Open the file in Google Sheet and format all currency columns as USD in the format `$1,000.00`
 - For the [gains and losses](#gains-and-losses) file
     - Ensure the sheet is called `G&L_Expanded`.
     - Verify that while reading the file, we skip the 2 rows from the beginning and 0 rows at the end because they contain metadata like totals and subtotals. If this changes, update the `__get_shares_sold` function in `etrade.py`.
+    - Open the file in Google Sheet and format all currency columns as USD in the format `$1,000.00`
 - Download the SBI Reference Rates for USD in `./data/SBI_REFERENCE_RATES_USD.csv` folder. This is to avoid downloading the files if you are running this script frequently to debug an issue. If you don't donwload this, skip the `--sbi-reference-rates` argument below and it will download it automatically for you.
 
 Generate the data for Schedule FA A3, Schedule CG and Schedule AL(partially), by running the following command -

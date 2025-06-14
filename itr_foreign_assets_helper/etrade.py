@@ -62,10 +62,10 @@ class ETradeTransactions:
         return data
     
     def __get_shares_issued(self, holdings_file: typing.IO) -> typing.List[stock.ShareIssuedRecord]:
-        sheet_name = 'Blocked'
+        sheet_name = 'Sellable'
         required_columns = {
             'Symbol': 'ticker',
-            'Blocked Qty.': 'shares_issued',
+            'Sellable Qty.': 'shares_issued',
             'Grant Number': 'award_number',
             'Release Date': 'issue_date',
             'Purchase Date FMV': 'fmv_per_share_on_issue_date',
@@ -74,7 +74,7 @@ class ETradeTransactions:
         # the first row is the column names and hence skipped
         row_to_skip_at_start = 1
         # the last row is the total and hence skipped
-        row_to_skip_at_end = 4
+        row_to_skip_at_end = 1
         raw_stocks_data = self.__extract_data(
             file=holdings_file,
             sheet_name=sheet_name,
@@ -102,7 +102,7 @@ class ETradeTransactions:
         sheet_name = 'G&L_Expanded'
         required_columns = {
             'Symbol': 'ticker',
-            'Qty.': 'shares_sold',
+            'Quantity': 'shares_sold',
             'Grant Number': 'award_number',
             'Date Acquired': 'issue_date',
             'Vest Date FMV': 'fmv_per_share_on_issue_date',
