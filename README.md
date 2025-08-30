@@ -12,16 +12,14 @@ This project is a helper for generating data related to ITR foreign assets.
 
 Install [mise](https://mise.jdx.dev/getting-started.html).
 
-Install `poetry`.
-
 ```shell
 mise install
 ```
 
-Install python packages
+Install Go packages
 
 ```
-poetry install
+make install-deps
 ```
 
 ### Fetch data from broker
@@ -135,4 +133,4 @@ Ensure you go through the logs to verify everything worked correctly.
 
 ## Disclaimer
 
-This is strictly for my own convinience and not an advice on how to declare foreign assets. Please consult your Chartered Accountant for any advice on how to declare foreign assets.
+This is strictly for my own convenience and not advice on how to declare foreign assets. Please consult your Chartered Accountant for any advice on how to declare foreign assets.
