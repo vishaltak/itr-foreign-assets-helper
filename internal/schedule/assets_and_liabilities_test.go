@@ -12,28 +12,61 @@ import (
 func createMockForexRates() *forex.SBIReferenceRates {
 	rates := forex.NewSBIReferenceRates()
 
-	// Add some test rates
-	for i := 1; i <= 31; i++ {
-		for month := 1; month <= 12; month++ {
-			date := time.Date(2023, time.Month(month), i, 0, 0, 0, 0, time.UTC)
-			rates.Rates[date.Format(time.DateOnly)] = forex.ReferenceRate{
-				Date:              date,
-				SourceCurrency:    "USD",
-				TargetCurrency:    "INR",
-				TTBuyExchangeRate: 82.50,
-			}
+	// A distinct rate per year lets tests assert which date's rate was used.
+	ratesByYear := map[int]float64{
+		2023: 82.50,
+		2024: 83.00,
+		2025: 84.00,
+		2026: 85.00,
+	}
 
-			date = time.Date(2024, time.Month(month), i, 0, 0, 0, 0, time.UTC)
-			rates.Rates[date.Format(time.DateOnly)] = forex.ReferenceRate{
-				Date:              date,
-				SourceCurrency:    "USD",
-				TargetCurrency:    "INR",
-				TTBuyExchangeRate: 83.00,
+	for year, rate := range ratesByYear {
+		for i := 1; i <= 31; i++ {
+			for month := 1; month <= 12; month++ {
+				date := time.Date(year, time.Month(month), i, 0, 0, 0, 0, time.UTC)
+				rates.Rates[date.Format(time.DateOnly)] = forex.ReferenceRate{
+					Date:              date,
+					SourceCurrency:    "USD",
+					TargetCurrency:    "INR",
+					TTBuyExchangeRate: rate,
+				}
 			}
 		}
 	}
 
 	return rates
+}
+
+func TestGenerateScheduleAL_HeldAsOnFinancialYearEnd(t *testing.T) {
+	forexRates := createMockForexRates()
+
+	// FY 2025-2026 => Schedule AL reflects holdings as on 31 Mar 2026.
+	heldAtYearEnd := stock.ShareIssuedRecord{
+		Ticker:       "AAPL",
+		AwardNumber:  "1",
+		SharesIssued: 10,
+		IssueDate:    time.Date(2026, 2, 15, 0, 0, 0, 0, time.UTC), // Jan-Mar 2026
+		FMVPerShare:  100.00,
+	}
+	// Issued after the FY end - belongs to the next FY, must be excluded.
+	issuedNextFY := stock.ShareIssuedRecord{
+		Ticker:       "MSFT",
+		AwardNumber:  "2",
+		SharesIssued: 10,
+		IssueDate:    time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC),
+		FMVPerShare:  100.00,
+	}
+
+	financialYear, err := stock.ParseFinancialYear("2025-2026")
+	require.NoError(t, err)
+
+	schedule, err := GenerateScheduleAL([]stock.ShareIssuedRecord{heldAtYearEnd, issuedNextFY}, forexRates, *financialYear)
+	require.NoError(t, err)
+
+	require.Len(t, schedule.Records, 1)
+	require.Equal(t, "AAPL", schedule.Records[0].ShareRecord.Ticker)
+	// Issue rate uses last day of previous month (Jan 2026 => 85.00).
+	require.Equal(t, 10*100.00*85.00, schedule.Records[0].CostOfAcquisition)
 }
 
 func TestGenerateScheduleAL(t *testing.T) {
@@ -42,7 +75,7 @@ func TestGenerateScheduleAL(t *testing.T) {
 	sharesIssued := []stock.ShareIssuedRecord{
 		{
 			Ticker:       "AAPL",
-			AwardNumber:  12345,
+			AwardNumber:  "12345",
 			SharesIssued: 100,
 			IssueDate:    time.Date(2023, 3, 15, 0, 0, 0, 0, time.UTC),
 			FMVPerShare:  150.00,

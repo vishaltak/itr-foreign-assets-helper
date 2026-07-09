@@ -101,10 +101,10 @@ func TestSBIReferenceRates_GetRate(t *testing.T) {
 			expectedTTBuyExchangeRate: 82.00,
 		},
 		{
-			name:                  "No exchange rate found for date",
+			name:                  "Gap larger than the lookback window fails loud",
 			date:                  time.Date(2024, 3, 30, 0, 0, 0, 0, time.UTC),
 			adjustToPreviousMonth: false,
-			expectedErrorStr:      "no exchange rate found for date",
+			expectedErrorStr:      "no exchange rate found within 15 days",
 		},
 	}
 

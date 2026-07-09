@@ -3,6 +3,7 @@ package etrade
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -96,6 +97,170 @@ func createTestGainsFile(t *testing.T) string {
 	return tmpFile
 }
 
+func TestProcessor_ProcessHoldings_AwardNumberIsString(t *testing.T) {
+	f := excelize.NewFile()
+	sheetName := "Sellable"
+	index, err := f.NewSheet(sheetName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.SetActiveSheet(index)
+
+	f.SetCellValue(sheetName, "A1", "Symbol")
+	f.SetCellValue(sheetName, "B1", "Sellable Qty.")
+	f.SetCellValue(sheetName, "C1", "Grant Number")
+	f.SetCellValue(sheetName, "D1", "Release Date")
+	f.SetCellValue(sheetName, "E1", "Purchase Date FMV")
+
+	f.SetCellValue(sheetName, "A2", "AAPL")
+	f.SetCellValue(sheetName, "B2", 100)
+	f.SetCellValue(sheetName, "C2", "007-A") // identifier, not a number
+	f.SetCellValue(sheetName, "D2", "15-Mar-2024")
+	f.SetCellValue(sheetName, "E2", "$150.00")
+
+	f.SetCellValue(sheetName, "A3", "Total")
+
+	f.DeleteSheet("Sheet1")
+	tmpFile := filepath.Join(t.TempDir(), "test_holdings_award.xlsx")
+	if err := f.SaveAs(tmpFile); err != nil {
+		t.Fatal(err)
+	}
+
+	processor := NewProcessor(stock.NewYahooClient(), forex.NewSBIReferenceRates())
+	records, err := processor.ProcessHoldings(tmpFile)
+	if err != nil {
+		t.Fatalf("ProcessHoldings() error = %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("Expected 1 record, got %d", len(records))
+	}
+	if records[0].AwardNumber != "007-A" {
+		t.Errorf("Expected award number \"007-A\" preserved as string, got %q", records[0].AwardNumber)
+	}
+}
+
+func TestProcessor_ProcessHoldings_DuplicateColumnFailsLoud(t *testing.T) {
+	f := excelize.NewFile()
+	sheetName := "Sellable"
+	index, err := f.NewSheet(sheetName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.SetActiveSheet(index)
+
+	// "Symbol" appears twice - a mislabeled export we must not silently mis-read.
+	f.SetCellValue(sheetName, "A1", "Symbol")
+	f.SetCellValue(sheetName, "B1", "Sellable Qty.")
+	f.SetCellValue(sheetName, "C1", "Grant Number")
+	f.SetCellValue(sheetName, "D1", "Release Date")
+	f.SetCellValue(sheetName, "E1", "Purchase Date FMV")
+	f.SetCellValue(sheetName, "F1", "Symbol")
+
+	f.SetCellValue(sheetName, "A2", "AAPL")
+	f.SetCellValue(sheetName, "A3", "Total")
+
+	f.DeleteSheet("Sheet1")
+	tmpFile := filepath.Join(t.TempDir(), "test_holdings_dupe.xlsx")
+	if err := f.SaveAs(tmpFile); err != nil {
+		t.Fatal(err)
+	}
+
+	processor := NewProcessor(stock.NewYahooClient(), forex.NewSBIReferenceRates())
+	_, err = processor.ProcessHoldings(tmpFile)
+	if err == nil {
+		t.Fatal("expected an error for duplicate column, got nil")
+	}
+	if !strings.Contains(err.Error(), "duplicate column") {
+		t.Errorf("expected duplicate column error, got: %v", err)
+	}
+}
+
+func TestProcessor_ProcessHoldings_UnparseableDateFailsClearly(t *testing.T) {
+	f := excelize.NewFile()
+	sheetName := "Sellable"
+	index, err := f.NewSheet(sheetName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.SetActiveSheet(index)
+
+	f.SetCellValue(sheetName, "A1", "Symbol")
+	f.SetCellValue(sheetName, "B1", "Sellable Qty.")
+	f.SetCellValue(sheetName, "C1", "Grant Number")
+	f.SetCellValue(sheetName, "D1", "Release Date")
+	f.SetCellValue(sheetName, "E1", "Purchase Date FMV")
+
+	f.SetCellValue(sheetName, "A2", "AAPL")
+	f.SetCellValue(sheetName, "B2", 100)
+	f.SetCellValue(sheetName, "C2", "12345")
+	f.SetCellValue(sheetName, "D2", "2024-03-15") // wrong format (not "15-Mar-2024")
+	f.SetCellValue(sheetName, "E2", "$150.00")
+	f.SetCellValue(sheetName, "A3", "Total")
+
+	f.DeleteSheet("Sheet1")
+	tmpFile := filepath.Join(t.TempDir(), "test_holdings_baddate.xlsx")
+	if err := f.SaveAs(tmpFile); err != nil {
+		t.Fatal(err)
+	}
+
+	processor := NewProcessor(stock.NewYahooClient(), forex.NewSBIReferenceRates())
+	_, err = processor.ProcessHoldings(tmpFile)
+	if err == nil {
+		t.Fatal("expected an error for unparseable date, got nil")
+	}
+	// The message should name the column and show the expected format so the
+	// user knows to export/format the date column as text.
+	msg := err.Error()
+	if !strings.Contains(msg, "Release Date") || !strings.Contains(msg, "15-Mar-2024") {
+		t.Errorf("expected actionable date error naming column and format, got: %v", err)
+	}
+}
+
+func TestProcessor_ProcessHoldings_FractionalShares(t *testing.T) {
+	f := excelize.NewFile()
+	sheetName := "Sellable"
+	index, err := f.NewSheet(sheetName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.SetActiveSheet(index)
+
+	f.SetCellValue(sheetName, "A1", "Symbol")
+	f.SetCellValue(sheetName, "B1", "Sellable Qty.")
+	f.SetCellValue(sheetName, "C1", "Grant Number")
+	f.SetCellValue(sheetName, "D1", "Release Date")
+	f.SetCellValue(sheetName, "E1", "Purchase Date FMV")
+
+	f.SetCellValue(sheetName, "A2", "AAPL")
+	f.SetCellValue(sheetName, "B2", 10.5) // fractional quantity
+	f.SetCellValue(sheetName, "C2", "12345")
+	f.SetCellValue(sheetName, "D2", "15-Mar-2024")
+	f.SetCellValue(sheetName, "E2", "$150.00")
+
+	// Total row (skipped)
+	f.SetCellValue(sheetName, "A3", "Total")
+	f.SetCellValue(sheetName, "B3", 10.5)
+
+	f.DeleteSheet("Sheet1")
+	tmpFile := filepath.Join(t.TempDir(), "test_holdings_fractional.xlsx")
+	if err := f.SaveAs(tmpFile); err != nil {
+		t.Fatal(err)
+	}
+
+	processor := NewProcessor(stock.NewYahooClient(), forex.NewSBIReferenceRates())
+	records, err := processor.ProcessHoldings(tmpFile)
+	if err != nil {
+		t.Fatalf("ProcessHoldings() error = %v", err)
+	}
+
+	if len(records) != 1 {
+		t.Fatalf("Expected 1 record, got %d", len(records))
+	}
+	if records[0].SharesIssued != 10.5 {
+		t.Errorf("Expected 10.5 shares (fractional preserved), got %v", records[0].SharesIssued)
+	}
+}
+
 func TestProcessor_ProcessHoldings(t *testing.T) {
 	holdingsFile := createTestHoldingsFile(t)
 	defer os.Remove(holdingsFile)
@@ -122,7 +287,7 @@ func TestProcessor_ProcessHoldings(t *testing.T) {
 		}
 
 		if record.SharesIssued != 100 {
-			t.Errorf("Expected 100 shares, got %d", record.SharesIssued)
+			t.Errorf("Expected 100 shares, got %v", record.SharesIssued)
 		}
 
 		if record.FMVPerShare != 150.00 {
@@ -162,7 +327,7 @@ func TestProcessor_ProcessGainsAndLosses(t *testing.T) {
 		}
 
 		if record.SharesSold != 50 {
-			t.Errorf("Expected 50 shares sold, got %d", record.SharesSold)
+			t.Errorf("Expected 50 shares sold, got %v", record.SharesSold)
 		}
 
 		if record.FMVOnIssueDate != 140.00 {

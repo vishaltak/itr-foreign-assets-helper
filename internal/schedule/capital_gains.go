@@ -55,8 +55,8 @@ func GenerateScheduleCG(
 			return nil, fmt.Errorf("getting sale rate: %w", err)
 		}
 
-		costOfAcquisition := float64(share.SharesSold) * share.FMVOnIssueDate * issueRate.TTBuyExchangeRate
-		fullValue := float64(share.SharesSold) * share.FMVOnSaleDate * saleRate.TTBuyExchangeRate
+		costOfAcquisition := share.SharesSold * share.FMVOnIssueDate * issueRate.TTBuyExchangeRate
+		fullValue := share.SharesSold * share.FMVOnSaleDate * saleRate.TTBuyExchangeRate
 
 		record := CapitalGainsRecord{
 			ShareRecord:              share,

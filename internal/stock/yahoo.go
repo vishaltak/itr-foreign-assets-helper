@@ -1,17 +1,23 @@
 package stock
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"time"
 )
 
+// yahooChartBaseURL is the Yahoo Finance chart API endpoint.
+const yahooChartBaseURL = "https://query2.finance.yahoo.com/v8/finance/chart"
+
 // YahooClient fetches stock data from Yahoo Finance
 type YahooClient struct {
-	client *http.Client
-	cache  map[string][]PriceData // Simple cache to avoid repeated API calls
+	client  *http.Client
+	cache   map[string][]PriceData // Simple cache to avoid repeated API calls
+	baseURL string                 // configurable for testing
 }
 
 // NewYahooClient creates a new Yahoo Finance client
@@ -20,22 +26,25 @@ func NewYahooClient() *YahooClient {
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		cache: make(map[string][]PriceData),
+		cache:   make(map[string][]PriceData),
+		baseURL: yahooChartBaseURL,
 	}
 }
 
-// yahooResponse represents the JSON response from Yahoo Finance API
+// yahooResponse represents the JSON response from Yahoo Finance API.
+// Prices are pointers so that a JSON null (a day with no data) is
+// distinguishable from a genuine 0.0 and can be skipped.
 type yahooResponse struct {
 	Chart struct {
 		Result []struct {
 			Timestamp  []int64 `json:"timestamp"`
 			Indicators struct {
 				Quote []struct {
-					Open   []float64 `json:"open"`
-					High   []float64 `json:"high"`
-					Low    []float64 `json:"low"`
-					Close  []float64 `json:"close"`
-					Volume []int64   `json:"volume"`
+					Open   []*float64 `json:"open"`
+					High   []*float64 `json:"high"`
+					Low    []*float64 `json:"low"`
+					Close  []*float64 `json:"close"`
+					Volume []*int64   `json:"volume"`
 				} `json:"quote"`
 			} `json:"indicators"`
 		} `json:"result"`
@@ -44,6 +53,63 @@ type yahooResponse struct {
 			Description string `json:"description"`
 		} `json:"error"`
 	} `json:"chart"`
+}
+
+// parseYahooChart decodes a Yahoo Finance chart response and returns the
+// price series, skipping any day whose OHLC data is null.
+func parseYahooChart(r io.Reader) ([]PriceData, error) {
+	var data yahooResponse
+	if err := json.NewDecoder(r).Decode(&data); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	if data.Chart.Error != nil {
+		return nil, fmt.Errorf("yahoo API error: %s", data.Chart.Error.Description)
+	}
+
+	if len(data.Chart.Result) == 0 || len(data.Chart.Result[0].Indicators.Quote) == 0 {
+		return nil, fmt.Errorf("no data returned")
+	}
+
+	result := data.Chart.Result[0]
+	quote := result.Indicators.Quote[0]
+
+	var prices []PriceData
+	for i := range result.Timestamp {
+		// Skip days where the close (or open) is null - Yahoo returns null
+		// for non-trading days and incomplete data.
+		if i >= len(quote.Close) || i >= len(quote.Open) {
+			continue
+		}
+		if quote.Close[i] == nil || quote.Open[i] == nil {
+			continue
+		}
+
+		prices = append(prices, PriceData{
+			Date:   time.Unix(result.Timestamp[i], 0),
+			Open:   deref(quote.Open, i),
+			High:   deref(quote.High, i),
+			Low:    deref(quote.Low, i),
+			Close:  deref(quote.Close, i),
+			Volume: derefInt(quote.Volume, i),
+		})
+	}
+
+	return prices, nil
+}
+
+func deref(s []*float64, i int) float64 {
+	if i < len(s) && s[i] != nil {
+		return *s[i]
+	}
+	return 0
+}
+
+func derefInt(s []*int64, i int) int64 {
+	if i < len(s) && s[i] != nil {
+		return *s[i]
+	}
+	return 0
 }
 
 // FetchHistoricalData retrieves historical stock data
@@ -65,8 +131,8 @@ func (y *YahooClient) FetchHistoricalData(ticker string, startDate, endDate time
 	apiEndDate := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 1)
 
 	url := fmt.Sprintf(
-		"https://query2.finance.yahoo.com/v8/finance/chart/%s?period1=%d&period2=%d&interval=1d&includePrePost=false",
-		ticker, apiStartDate.Unix(), apiEndDate.Unix(),
+		"%s/%s?period1=%d&period2=%d&interval=1d&includePrePost=false",
+		y.baseURL, ticker, apiStartDate.Unix(), apiEndDate.Unix(),
 	)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -83,41 +149,20 @@ func (y *YahooClient) FetchHistoricalData(ticker string, startDate, endDate time
 	}
 	defer resp.Body.Close()
 
-	//if resp.StatusCode != http.StatusOK {
-	//	return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	//}
-
-	var data yahooResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	// Read the whole body: Yahoo returns a useful error description in the
+	// JSON body even for non-200 responses (e.g. 404 for a delisted symbol),
+	// so prefer that message; otherwise fail loud on the status code.
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
 	}
 
-	if data.Chart.Error != nil {
-		return nil, fmt.Errorf("yahoo API error: %s", data.Chart.Error.Description)
-	}
-
-	if len(data.Chart.Result) == 0 || len(data.Chart.Result[0].Indicators.Quote) == 0 {
-		return nil, fmt.Errorf("no data returned for ticker %s", ticker)
-	}
-
-	result := data.Chart.Result[0]
-	quote := result.Indicators.Quote[0]
-
-	var prices []PriceData
-	for i := range result.Timestamp {
-		// Skip if any values are null (happens sometimes)
-		if i >= len(quote.Close) || i >= len(quote.Open) {
-			continue
+	prices, err := parseYahooChart(bytes.NewReader(body))
+	if err != nil {
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("yahoo request for %s failed with status %d: %w", ticker, resp.StatusCode, err)
 		}
-
-		prices = append(prices, PriceData{
-			Date:   time.Unix(result.Timestamp[i], 0),
-			Open:   quote.Open[i],
-			High:   quote.High[i],
-			Low:    quote.Low[i],
-			Close:  quote.Close[i],
-			Volume: quote.Volume[i],
-		})
+		return nil, err
 	}
 
 	if len(prices) == 0 {

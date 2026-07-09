@@ -32,11 +32,22 @@ type ForeignAssetsA3 struct {
 	FinancialYear stock.FinancialYear
 }
 
-// GenerateScheduleFAA3 generates Schedule FA A3
+// PriceProvider supplies historical stock prices.
+// *stock.YahooClient implements it; tests can supply a deterministic fake.
+type PriceProvider interface {
+	GetPeakClosingValue(ticker string, startDate, endDate time.Time) (float64, time.Time, error)
+	GetClosingPriceOnDate(ticker string, targetDate time.Time) (float64, time.Time, error)
+}
+
+// GenerateScheduleFAA3 generates Schedule FA A3.
+//
+// Schedule FA is reported for the calendar year of the financial year's start
+// (1 January to 31 December, both inclusive), unlike Schedule CG/AL which use
+// the Indian financial year (1 April to 31 March).
 func GenerateScheduleFAA3(
 	sharesIssued []stock.ShareIssuedRecord,
 	sharesSold []stock.ShareSoldRecord,
-	yahooClient *stock.YahooClient,
+	priceProvider PriceProvider,
 	forexRates *forex.SBIReferenceRates,
 	financialYear stock.FinancialYear,
 ) (*ForeignAssetsA3, error) {
@@ -44,14 +55,17 @@ func GenerateScheduleFAA3(
 		FinancialYear: financialYear,
 	}
 
+	calendarYearStart := financialYear.ForeignAssetsStart()
+	calendarYearEnd := financialYear.ForeignAssetsEnd()
+
 	// Process shares issued (still held at year end)
 	for _, share := range sharesIssued {
-		// Skip if issued after year end
-		if share.IssueDate.After(financialYear.End) {
+		// Skip if issued after the calendar year end (31 December).
+		if share.IssueDate.After(calendarYearEnd) {
 			continue
 		}
 
-		record, err := createFARecordForIssuedShare(share, yahooClient, forexRates, financialYear.End)
+		record, err := createFARecordForIssuedShare(share, priceProvider, forexRates, calendarYearEnd)
 		if err != nil {
 			return nil, fmt.Errorf("processing issued share: %w", err)
 		}
@@ -61,12 +75,13 @@ func GenerateScheduleFAA3(
 
 	// Process shares sold
 	for _, share := range sharesSold {
-		// Skip if sold before year start or issued after year end
-		if share.SaleDate.Before(financialYear.Start) || share.IssueDate.After(financialYear.End) {
+		// Skip if sold before the calendar year start (1 January) or issued
+		// after the calendar year end (31 December).
+		if share.SaleDate.Before(calendarYearStart) || share.IssueDate.After(calendarYearEnd) {
 			continue
 		}
 
-		record, err := createFARecordForSoldShare(share, yahooClient, forexRates, financialYear.End)
+		record, err := createFARecordForSoldShare(share, priceProvider, forexRates)
 		if err != nil {
 			return nil, fmt.Errorf("processing sold share: %w", err)
 		}
@@ -79,7 +94,7 @@ func GenerateScheduleFAA3(
 
 func createFARecordForIssuedShare(
 	share stock.ShareIssuedRecord,
-	yahooClient *stock.YahooClient,
+	priceProvider PriceProvider,
 	forexRates *forex.SBIReferenceRates,
 	yearEnd time.Time,
 ) (ForeignAssetsA3Record, error) {
@@ -90,7 +105,7 @@ func createFARecordForIssuedShare(
 	}
 
 	// Get peak closing value between issue date and year end
-	peakClose, peakDate, err := yahooClient.GetPeakClosingValue(share.Ticker, share.IssueDate, yearEnd)
+	peakClose, peakDate, err := priceProvider.GetPeakClosingValue(share.Ticker, share.IssueDate, yearEnd)
 	if err != nil {
 		return ForeignAssetsA3Record{}, fmt.Errorf("getting peak value: %w", err)
 	}
@@ -102,7 +117,7 @@ func createFARecordForIssuedShare(
 	}
 
 	// Get year-end closing value
-	yearEndClose, lastTradingDate, err := yahooClient.GetClosingPriceOnDate(share.Ticker, yearEnd)
+	yearEndClose, lastTradingDate, err := priceProvider.GetClosingPriceOnDate(share.Ticker, yearEnd)
 	if err != nil {
 		return ForeignAssetsA3Record{}, fmt.Errorf("getting year-end value: %w", err)
 	}
@@ -117,9 +132,9 @@ func createFARecordForIssuedShare(
 		ShareRecord:              share,
 		TransactionType:          stock.TransactionIssued,
 		DateOfAcquiringInterest:  share.IssueDate,
-		InitialValueOfInvestment: float64(share.SharesIssued) * share.FMVPerShare * issueRate.TTBuyExchangeRate,
-		PeakValueOfInvestment:    float64(share.SharesIssued) * peakClose * peakRate.TTBuyExchangeRate,
-		ClosingValue:             float64(share.SharesIssued) * yearEndClose * yearEndRate.TTBuyExchangeRate,
+		InitialValueOfInvestment: share.SharesIssued * share.FMVPerShare * issueRate.TTBuyExchangeRate,
+		PeakValueOfInvestment:    share.SharesIssued * peakClose * peakRate.TTBuyExchangeRate,
+		ClosingValue:             share.SharesIssued * yearEndClose * yearEndRate.TTBuyExchangeRate,
 		TotalGrossAmountPaid:     0, // No dividends
 		TotalProceedsFromSale:    0, // Not sold
 		PeakClosingDate:          peakDate,
@@ -131,9 +146,8 @@ func createFARecordForIssuedShare(
 
 func createFARecordForSoldShare(
 	share stock.ShareSoldRecord,
-	yahooClient *stock.YahooClient,
+	priceProvider PriceProvider,
 	forexRates *forex.SBIReferenceRates,
-	yearEnd time.Time,
 ) (ForeignAssetsA3Record, error) {
 	// Get exchange rates
 	_, issueRate, err := forexRates.GetRate(share.IssueDate, true)
@@ -147,7 +161,7 @@ func createFARecordForSoldShare(
 	}
 
 	// Get peak closing value between issue date and sale date
-	peakClose, peakDate, err := yahooClient.GetPeakClosingValue(share.Ticker, share.IssueDate, share.SaleDate)
+	peakClose, peakDate, err := priceProvider.GetPeakClosingValue(share.Ticker, share.IssueDate, share.SaleDate)
 	if err != nil {
 		return ForeignAssetsA3Record{}, fmt.Errorf("getting peak value: %w", err)
 	}
@@ -161,11 +175,11 @@ func createFARecordForSoldShare(
 		ShareRecord:              share,
 		TransactionType:          stock.TransactionSold,
 		DateOfAcquiringInterest:  share.IssueDate,
-		InitialValueOfInvestment: float64(share.SharesSold) * share.FMVOnIssueDate * issueRate.TTBuyExchangeRate,
-		PeakValueOfInvestment:    float64(share.SharesSold) * peakClose * peakRate.TTBuyExchangeRate,
+		InitialValueOfInvestment: share.SharesSold * share.FMVOnIssueDate * issueRate.TTBuyExchangeRate,
+		PeakValueOfInvestment:    share.SharesSold * peakClose * peakRate.TTBuyExchangeRate,
 		ClosingValue:             0, // Sold before year end
 		TotalGrossAmountPaid:     0, // No dividends
-		TotalProceedsFromSale:    float64(share.SharesSold) * share.FMVOnSaleDate * saleRate.TTBuyExchangeRate,
+		TotalProceedsFromSale:    share.SharesSold * share.FMVOnSaleDate * saleRate.TTBuyExchangeRate,
 		PeakClosingDate:          peakDate,
 		PeakClosingValue:         peakClose,
 	}, nil

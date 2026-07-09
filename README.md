@@ -71,19 +71,21 @@ Before running the script, ensure you check the following -
         - Rename the `Blocked` sheet to `Sellable`.
         - Rename the `Blocked` column to `Sellable` in `Sellable` sheet.
         - Rename the `Blocked Qty.` column to `Sellable Qty.` in `Sellable` sheet.
-    - Verify that while reading the file, we need to skip the 1 row from the beginning and 1 row at the end because they contain metadata like names, subtotals and totals. If this changes, update the `__get_shares_issued` function in `etrade.py`.
+    - Verify that while reading the file, we need to skip the 1 row from the beginning and 1 row at the end because they contain metadata like names, subtotals and totals. If this changes, update the `ProcessHoldings` function in `internal/etrade/processor.go`.
     - Open the file in Google Sheet and format all currency columns as USD in the format `$1,000.00`
 - For the [gains and losses](#gains-and-losses) file
     - Ensure the sheet is called `G&L_Expanded`.
-    - Verify that while reading the file, we skip the 2 rows from the beginning and 0 rows at the end because they contain metadata like totals and subtotals. If this changes, update the `__get_shares_sold` function in `etrade.py`.
+    - Verify that while reading the file, we skip the 2 rows from the beginning and 0 rows at the end because they contain metadata like totals and subtotals. If this changes, update the `ProcessGainsAndLosses` function in `internal/etrade/processor.go`.
     - Open the file in Google Sheet and format all currency columns as USD in the format `$1,000.00`
 - Download the SBI Reference Rates for USD in `./data/SBI_REFERENCE_RATES_USD.csv` folder. This is to avoid downloading the files if you are running this script frequently to debug an issue. If you don't donwload this, skip the `--sbi-reference-rates` argument below and it will download it automatically for you.
 
 Generate the data for Schedule FA A3, Schedule CG and Schedule AL(partially), by running the following command -
 
 ```
-poetry run generate-itr-data --financial-year "YYYY-YYYY" --sbi-reference-rates "./data/SBI_REFERENCE_RATES_USD.csv" --etrade-holdings "<path_to_holdings_file>" --etrade-sale-transactions "<path_to_gains_and_losses_file>"
+go run ./cmd/main.go --financial-year "YYYY-YYYY" --sbi-reference-rates "./data/SBI_REFERENCE_RATES_USD.csv" --etrade-holdings "<path_to_holdings_file>" --etrade-sale-transactions "<path_to_gains_and_losses_file>"
 ```
+
+The generated workbook is written to `./output/itr-helper-fy-<start>-<end>.xlsx` (override the directory with `--output-dir`).
 
 Follow the steps below to populate [Schedule FA A2](#schedule-fa-a2) and [Scehdule AL](#schedule-al).
 
@@ -117,8 +119,8 @@ Ensure you go through the logs to verify everything worked correctly.
         - [Needs to be done manually](#schedule-al)
 - What exchange rate is being used?
     - SBI Telegraphic Transfer Rate Buying Rate(TTBR) for USD are used to convert to INR. These values are published (almost) everyday by SBI [here](https://sbi.co.in/documents/16012/1400784/FOREX_CARD_RATES.pdf). However, it is not possible to view historical rates. https://github.com/sahilgupta/sbi-fx-ratekeeper keeps a historical record which we use.
-    - For converting a stock's fair-market-value(FMV) on a particular day, we use the SBI TTBR for last day of the previous month as per the ITR rules. e.g. to convert the sale price of stock sold on 15 June 2023, the SBI TTBR for 31 May 2023. If the SBI TTBR for 31 May 2023 is not available for some reason, we subtract one day until we find a value.
-    - For converting the closing value of a stock issued on year close, we use the SBI TTBR on 31st December. If the SBI TTBR for 31 December is not available for some reason, we subtract one day until we find a value.
+    - For converting a stock's fair-market-value(FMV) on a particular day, we use the SBI TTBR for last day of the previous month as per the ITR rules. e.g. to convert the sale price of stock sold on 15 June 2023, the SBI TTBR for 31 May 2023. If the SBI TTBR for 31 May 2023 is not available for some reason, we subtract one day until we find a value (up to 15 days back; if no rate is found within that window the run fails loudly so a gap in the SBI data is caught rather than silently using a stale rate).
+    - For converting the closing value of a stock issued on year close, we use the SBI TTBR on 31st December. If the SBI TTBR for 31 December is not available for some reason, we subtract one day until we find a value (up to 15 days back, as above).
 - How is the Peak Closing Value of the stock calculated for Schedule FA A3?
     - For stocks issued but not sold as on 31st December, the maximum of the closing value of the stock from the date of issue to the 31st December - both inclusive - is the peak closing value of the stock which is then converted to INR as explained above.
     - For stocks sold before 31st December, the maximum of the closing value of the stock from the date of issue to the date of sale - both inclusive - is the peak closing value of the stock which is then converted to INR as explained above.
@@ -131,6 +133,43 @@ Ensure you go through the logs to verify everything worked correctly.
     - For stocks issued but not sold as on 31st December, the value is 0.
     - For stocks sold before 31st December, the value is the (sale value - issue value) which is then converted to INR as explained above.
 
+## Testing
+
+Run the unit tests (fully offline, no network):
+
+```
+go test ./...
+```
+
+### End-to-end test
+
+`test/e2e/` contains an end-to-end test that runs the whole pipeline against
+anonymized ETrade fixtures in `test/e2e/testdata/` and compares the generated
+workbook cell-by-cell (every sheet, row, and column) against a committed golden
+workbook, `test/e2e/testdata/expected.xlsx`. It is skipped by default because it
+uses live Yahoo Finance prices; enable it with:
+
+```
+RUN_E2E=1 go test ./test/e2e/
+```
+
+If GTLB's historical prices legitimately change (Yahoo revisions), regenerate
+the golden workbook and review the diff:
+
+```
+RUN_E2E=1 UPDATE_GOLDEN=1 go test ./test/e2e/
+```
+
+The fixtures were generated from real ETrade exports and de-identified: the
+share quantities are replaced with pseudo-random values (so compensation cannot
+be derived) and grant/order numbers are synthetic. The real ticker, vest/sale
+dates, and per-share prices are retained so the run stays representative - these
+are public market data. The fixtures are rebuilt from scratch (not edited
+copies) so no document metadata or unused columns/sheets leak real data.
+`SBI_REFERENCE_RATES_USD.csv` there is a checked-in copy of the public SBI
+reference rates so the test is reproducible.
+
 ## Disclaimer
 
-This is strictly for my own convenience and not advice on how to declare foreign assets. Please consult your Chartered Accountant for any advice on how to declare foreign assets.
+This is strictly for my own convenience and not advice on how to declare foreign assets.
+Please consult your Chartered Accountant for any advice on how to declare foreign assets.

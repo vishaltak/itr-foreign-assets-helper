@@ -15,7 +15,7 @@ import (
 
 func main() {
 	var (
-		financialYearStr = flag.String("financial-year", "", "Financial year (e.g., 2023-2024)")
+		financialYearStr = flag.String("financial-year", "", "Financial year (e.g., 2025-2026)")
 		holdingsFile     = flag.String("etrade-holdings", "", "ETrade holdings file (Excel)")
 		gainsFile        = flag.String("etrade-sale-transactions", "", "ETrade gains and losses file (Excel)")
 		sbiRatesFile     = flag.String("sbi-reference-rates", "", "SBI reference rates CSV (optional)")
@@ -115,7 +115,7 @@ func main() {
 
 	// Print summary
 	fmt.Println("\n=== SUMMARY ===")
-	fmt.Printf("Financial Year: %s\n", *financialYear)
+	fmt.Printf("Financial Year: %s\n", financialYear.String())
 	fmt.Printf("Shares Issued Records: %d\n", len(sharesIssued))
 	fmt.Printf("Shares Sold Records: %d\n", len(sharesSold))
 	fmt.Printf("Schedule FA A3 Records: %d\n", len(faSchedule.Records))

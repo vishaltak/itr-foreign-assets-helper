@@ -3,6 +3,7 @@ package schedule
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/vtak/itr-foreign-assets-helper/internal/stock"
@@ -77,14 +78,14 @@ func exportScheduleFAA3(f *excelize.File, schedule *ForeignAssetsA3) error {
 		switch r := record.ShareRecord.(type) {
 		case stock.ShareIssuedRecord:
 			ticker = r.Ticker
-			shares = fmt.Sprintf("%d", r.SharesIssued)
+			shares = strconv.FormatFloat(r.SharesIssued, 'f', -1, 64)
 			issueDate = r.IssueDate
 			issueFMV = r.FMVPerShare
 			saleDate = "-"
 			saleFMV = "-"
 		case stock.ShareSoldRecord:
 			ticker = r.Ticker
-			shares = fmt.Sprintf("%d", r.SharesSold)
+			shares = strconv.FormatFloat(r.SharesSold, 'f', -1, 64)
 			issueDate = r.IssueDate
 			issueFMV = r.FMVOnIssueDate
 			saleDate = r.SaleDate.Format("2006-01-02")

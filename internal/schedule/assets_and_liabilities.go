@@ -44,7 +44,7 @@ func GenerateScheduleAL(
 
 		record := AssetsAndLiabilitiesRecord{
 			ShareRecord:       share,
-			CostOfAcquisition: float64(share.SharesIssued) * share.FMVPerShare * issueRate.TTBuyExchangeRate,
+			CostOfAcquisition: share.SharesIssued * share.FMVPerShare * issueRate.TTBuyExchangeRate,
 			CostOfImprovement: 0,
 		}
 

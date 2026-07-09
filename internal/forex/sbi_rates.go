@@ -107,6 +107,13 @@ func (s *SBIReferenceRates) parseCSV(r io.Reader) error {
 	return nil
 }
 
+// maxRateLookbackDays bounds how far GetRate walks backwards looking for a
+// published rate. SBI publishes rates on (almost) every working day, so a gap
+// wider than this indicates missing/corrupt reference-rate data rather than a
+// normal weekend/holiday, and we fail loudly instead of silently drifting to a
+// stale rate far from the requested date.
+const maxRateLookbackDays = 15
+
 // GetRate gets the exchange rate for a specific date
 func (s *SBIReferenceRates) GetRate(date time.Time, adjustToPreviousMonth bool) (time.Time, ReferenceRate, error) {
 	adjustedDate := date
@@ -114,25 +121,23 @@ func (s *SBIReferenceRates) GetRate(date time.Time, adjustToPreviousMonth bool) 
 	if adjustToPreviousMonth {
 		// Get last day of previous month
 		adjustedDate = adjustedDate.AddDate(0, 0, -1*adjustedDate.Day())
-		//adjustedDate = time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, date.Location()).AddDate(0, 0, -1)
 	}
 
-	// If exact date not found, go backwards until we find a rate
-	for i := 0; i < 15; i++ { // Maximum 15 days backward search
+	// If exact date not found, go backwards until we find a rate, but only
+	// within the lookback window.
+	searchFrom := adjustedDate
+	for i := 0; i < maxRateLookbackDays; i++ {
 		if rate, ok := s.Rates[adjustedDate.Format(time.DateOnly)]; ok {
 			return adjustedDate, rate, nil
 		}
 		adjustedDate = adjustedDate.AddDate(0, 0, -1)
 	}
 
-	return time.Time{}, ReferenceRate{}, fmt.Errorf("no exchange rate found for date %s", date.Format(time.DateOnly))
-}
-
-// GetRateForDate is a convenience method
-func (s *SBIReferenceRates) GetRateForDate(date time.Time) (float64, error) {
-	_, rate, err := s.GetRate(date, false)
-	if err != nil {
-		return 0, err
-	}
-	return rate.TTBuyExchangeRate, nil
+	return time.Time{}, ReferenceRate{}, fmt.Errorf(
+		"no exchange rate found within %d days on or before %s (searched %s..%s); SBI reference rate data likely has a gap",
+		maxRateLookbackDays,
+		searchFrom.Format(time.DateOnly),
+		adjustedDate.AddDate(0, 0, 1).Format(time.DateOnly),
+		searchFrom.Format(time.DateOnly),
+	)
 }

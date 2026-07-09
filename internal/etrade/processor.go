@@ -2,6 +2,7 @@ package etrade
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -9,6 +10,58 @@ import (
 	"github.com/vtak/itr-foreign-assets-helper/internal/stock"
 	"github.com/xuri/excelize/v2"
 )
+
+// parseMoney parses a currency value, stripping a leading "$" and any
+// thousands separators (e.g. "$1,234.50" -> 1234.50).
+func parseMoney(s string) (float64, error) {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "$")
+	s = strings.ReplaceAll(s, ",", "")
+	return strconv.ParseFloat(s, 64)
+}
+
+// parseShares parses a (possibly fractional) share quantity.
+func parseShares(s string) (float64, error) {
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, ",", "")
+	return strconv.ParseFloat(s, 64)
+}
+
+// parseDate parses a date cell, returning an actionable error that names the
+// column and the expected text format when parsing fails (typically because the
+// column was exported as a real date cell rather than text).
+func parseDate(column, layout, example, value string, row int) (time.Time, error) {
+	t, err := time.Parse(layout, value)
+	if err != nil {
+		return time.Time{}, fmt.Errorf(
+			"parsing %s %q at row %d: expected a text date like %q (format the column as text if it is a date cell): %w",
+			column, value, row, example, err,
+		)
+	}
+	return t, nil
+}
+
+// buildColumnMap maps header names to their column index and fails loud if any
+// required column is duplicated (a mislabeled sheet) or missing.
+func buildColumnMap(headers []string, required map[string]string) (map[string]int, error) {
+	colMap := make(map[string]int)
+	seen := make(map[string]bool)
+	for i, header := range headers {
+		if _, ok := required[header]; ok {
+			if seen[header] {
+				return nil, fmt.Errorf("duplicate column %q in sheet", header)
+			}
+			seen[header] = true
+		}
+		colMap[header] = i
+	}
+	for col := range required {
+		if _, ok := colMap[col]; !ok {
+			return nil, fmt.Errorf("missing required column: %s", col)
+		}
+	}
+	return colMap, nil
+}
 
 // Processor handles ETrade file processing
 type Processor struct {
@@ -42,13 +95,6 @@ func (p *Processor) ProcessHoldings(filename string) ([]stock.ShareIssuedRecord,
 		return nil, fmt.Errorf("insufficient data in holdings file")
 	}
 
-	// Find column indices
-	headers := rows[0]
-	colMap := make(map[string]int)
-	for i, header := range headers {
-		colMap[header] = i
-	}
-
 	requiredCols := map[string]string{
 		"Symbol":            "ticker",
 		"Sellable Qty.":     "shares",
@@ -57,11 +103,9 @@ func (p *Processor) ProcessHoldings(filename string) ([]stock.ShareIssuedRecord,
 		"Purchase Date FMV": "fmv",
 	}
 
-	// Verify required columns exist
-	for col := range requiredCols {
-		if _, ok := colMap[col]; !ok {
-			return nil, fmt.Errorf("missing required column: %s", col)
-		}
+	colMap, err := buildColumnMap(rows[0], requiredCols)
+	if err != nil {
+		return nil, err
 	}
 
 	var records []stock.ShareIssuedRecord
@@ -74,25 +118,25 @@ func (p *Processor) ProcessHoldings(filename string) ([]stock.ShareIssuedRecord,
 		}
 
 		// Parse release date (format: "15-Mar-2024")
-		dateStr := row[colMap["Release Date"]]
-		issueDate, err := time.Parse("02-Jan-2006", dateStr)
+		issueDate, err := parseDate("Release Date", "02-Jan-2006", "15-Mar-2024", row[colMap["Release Date"]], i+1)
 		if err != nil {
-			return nil, fmt.Errorf("parsing date %s at row %d: %w", dateStr, i+1, err)
+			return nil, err
 		}
 
 		// Parse FMV (remove $ sign)
-		fmvStr := strings.TrimPrefix(row[colMap["Purchase Date FMV"]], "$")
-		fmvStr = strings.ReplaceAll(fmvStr, ",", "")
-		var fmv float64
-		fmt.Sscanf(fmvStr, "%f", &fmv)
+		fmv, err := parseMoney(row[colMap["Purchase Date FMV"]])
+		if err != nil {
+			return nil, fmt.Errorf("parsing FMV at row %d: %w", i+1, err)
+		}
 
-		// Parse shares
-		var shares int
-		fmt.Sscanf(row[colMap["Sellable Qty."]], "%d", &shares)
+		// Parse shares (may be fractional)
+		shares, err := parseShares(row[colMap["Sellable Qty."]])
+		if err != nil {
+			return nil, fmt.Errorf("parsing shares at row %d: %w", i+1, err)
+		}
 
-		// Parse award number
-		var awardNum int
-		fmt.Sscanf(row[colMap["Grant Number"]], "%d", &awardNum)
+		// Award/grant number is an identifier, kept as a string.
+		awardNum := strings.TrimSpace(row[colMap["Grant Number"]])
 
 		record := stock.ShareIssuedRecord{
 			SourceMetadata: stock.SourceMetadata{
@@ -132,13 +176,6 @@ func (p *Processor) ProcessGainsAndLosses(filename string) ([]stock.ShareSoldRec
 		return nil, fmt.Errorf("insufficient data in gains file")
 	}
 
-	// Find column indices (header is at row 0)
-	headers := rows[0]
-	colMap := make(map[string]int)
-	for i, header := range headers {
-		colMap[header] = i
-	}
-
 	requiredCols := map[string]string{
 		"Symbol":             "ticker",
 		"Quantity":           "shares",
@@ -150,11 +187,9 @@ func (p *Processor) ProcessGainsAndLosses(filename string) ([]stock.ShareSoldRec
 		"Order Number":       "order",
 	}
 
-	// Verify required columns
-	for col := range requiredCols {
-		if _, ok := colMap[col]; !ok {
-			return nil, fmt.Errorf("missing required column: %s", col)
-		}
+	colMap, err := buildColumnMap(rows[0], requiredCols)
+	if err != nil {
+		return nil, err
 	}
 
 	var records []stock.ShareSoldRecord
@@ -167,35 +202,35 @@ func (p *Processor) ProcessGainsAndLosses(filename string) ([]stock.ShareSoldRec
 		}
 
 		// Parse dates (format: "MM/DD/YYYY")
-		issueDateStr := row[colMap["Date Acquired"]]
-		issueDate, err := time.Parse("01/02/2006", issueDateStr)
+		issueDate, err := parseDate("Date Acquired", "01/02/2006", "03/15/2023", row[colMap["Date Acquired"]], i+1)
 		if err != nil {
-			return nil, fmt.Errorf("parsing issue date %s at row %d: %w", issueDateStr, i+1, err)
+			return nil, err
 		}
 
-		saleDateStr := row[colMap["Date Sold"]]
-		saleDate, err := time.Parse("01/02/2006", saleDateStr)
+		saleDate, err := parseDate("Date Sold", "01/02/2006", "06/15/2024", row[colMap["Date Sold"]], i+1)
 		if err != nil {
-			return nil, fmt.Errorf("parsing sale date %s at row %d: %w", saleDateStr, i+1, err)
+			return nil, err
 		}
 
 		// Parse FMV values
-		issueFMVStr := strings.TrimPrefix(row[colMap["Vest Date FMV"]], "$")
-		issueFMVStr = strings.ReplaceAll(issueFMVStr, ",", "")
-		var issueFMV float64
-		fmt.Sscanf(issueFMVStr, "%f", &issueFMV)
+		issueFMV, err := parseMoney(row[colMap["Vest Date FMV"]])
+		if err != nil {
+			return nil, fmt.Errorf("parsing issue FMV at row %d: %w", i+1, err)
+		}
 
-		saleFMVStr := strings.TrimPrefix(row[colMap["Proceeds Per Share"]], "$")
-		saleFMVStr = strings.ReplaceAll(saleFMVStr, ",", "")
-		var saleFMV float64
-		fmt.Sscanf(saleFMVStr, "%f", &saleFMV)
+		saleFMV, err := parseMoney(row[colMap["Proceeds Per Share"]])
+		if err != nil {
+			return nil, fmt.Errorf("parsing sale FMV at row %d: %w", i+1, err)
+		}
 
-		// Parse quantities
-		var shares int
-		fmt.Sscanf(row[colMap["Quantity"]], "%d", &shares)
+		// Parse quantities (may be fractional)
+		shares, err := parseShares(row[colMap["Quantity"]])
+		if err != nil {
+			return nil, fmt.Errorf("parsing shares at row %d: %w", i+1, err)
+		}
 
-		var awardNum int
-		fmt.Sscanf(row[colMap["Grant Number"]], "%d", &awardNum)
+		// Award/grant number is an identifier, kept as a string.
+		awardNum := strings.TrimSpace(row[colMap["Grant Number"]])
 
 		record := stock.ShareSoldRecord{
 			SourceMetadata: stock.SourceMetadata{
