@@ -113,6 +113,16 @@ func main() {
 
 	log.Println("Successfully generated ITR data!")
 
+	// Advise on the rounding effect of ETrade's per-share prices. Proceeds use
+	// the reported Total Proceeds; this reports how much the quantity x
+	// per-share reconstruction would have differed, in case cross-checking.
+	if total, largest := schedule.ProceedsRoundingDiscrepancy(sharesSold, forexRates); total >= 1.0 {
+		log.Printf("NOTE: sale proceeds use ETrade's reported Total Proceeds. Valuing them "+
+			"as quantity x per-share price instead would differ by ~₹%.2f in aggregate "+
+			"(largest ₹%.2f on a single lot), due to ETrade rounding its per-share figures.",
+			total, largest)
+	}
+
 	// Print summary
 	fmt.Println("\n=== SUMMARY ===")
 	fmt.Printf("Financial Year: %s\n", financialYear.String())

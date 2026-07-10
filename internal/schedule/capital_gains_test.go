@@ -20,6 +20,7 @@ func TestGenerateScheduleCG_FinancialYearWindow(t *testing.T) {
 		SharesSold:     10,
 		SaleDate:       time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC), // Jan-Mar 2026, inside FY
 		FMVOnSaleDate:  200.00,
+		TotalProceeds:  1999.50, // deliberately != 10*200, to prove full value uses this
 	}
 	// Sold before the FY start (belongs to the previous FY) - must be excluded.
 	beforeFY := stock.ShareSoldRecord{
@@ -54,14 +55,30 @@ func TestGenerateScheduleCG_FinancialYearWindow(t *testing.T) {
 
 	// Issue rate uses last day of previous month (Apr 2025 => 84.00),
 	// sale rate uses last day of previous month (Jan 2026 => 85.00).
+	// Full value is Total Proceeds (not quantity x per-share) x sale rate.
 	require.Equal(t, 10*100.00*84.00, schedule.Records[0].CostOfAcquisition)
-	require.Equal(t, 10*200.00*85.00, schedule.Records[0].FullValueOfConsideration)
+	require.Equal(t, 1999.50*85.00, schedule.Records[0].FullValueOfConsideration)
 
 	// The applied rates and the (adjusted) dates they came from are recorded.
 	require.Equal(t, 84.00, schedule.Records[0].IssueDate.Rate.TTBuyExchangeRate)
 	require.Equal(t, time.Date(2025, 4, 30, 0, 0, 0, 0, time.UTC), schedule.Records[0].IssueDate.Rate.Date)
 	require.Equal(t, 85.00, schedule.Records[0].SaleDate.Rate.TTBuyExchangeRate)
 	require.Equal(t, time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC), schedule.Records[0].SaleDate.Rate.Date)
+}
+
+func TestProceedsRoundingDiscrepancy(t *testing.T) {
+	forexRates := createMockForexRates()
+	sold := []stock.ShareSoldRecord{
+		// 26*41.63 = 1082.38, but actual Total Proceeds is 1082.33 -> $0.05 gap.
+		{SharesSold: 26, FMVOnSaleDate: 41.63, TotalProceeds: 1082.33, SaleDate: time.Date(2025, 6, 16, 0, 0, 0, 0, time.UTC)},
+		// Exact: 10*200 == 2000 -> no gap.
+		{SharesSold: 10, FMVOnSaleDate: 200, TotalProceeds: 2000, SaleDate: time.Date(2025, 6, 16, 0, 0, 0, 0, time.UTC)},
+	}
+
+	// Sale 2025-06-16 -> rate for 31 May 2025 => 84.00 (from the mock).
+	total, largest := ProceedsRoundingDiscrepancy(sold, forexRates)
+	require.InDelta(t, 0.05*84.0, total, 0.01)
+	require.InDelta(t, 0.05*84.0, largest, 0.01)
 }
 
 func TestGenerateScheduleCG(t *testing.T) {
@@ -76,6 +93,7 @@ func TestGenerateScheduleCG(t *testing.T) {
 			SharesSold:     50,
 			SaleDate:       time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC),
 			FMVOnSaleDate:  180.00,
+			TotalProceeds:  9000.00, // == 50 * 180
 		},
 	}
 

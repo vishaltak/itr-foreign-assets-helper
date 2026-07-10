@@ -192,6 +192,7 @@ func createFARecordForSoldShare(
 		PeakValueOfInvestment:    share.SharesSold * peakClose * peakRate.TTBuyExchangeRate,
 		ClosingValue:             0, // Sold before year end
 		TotalGrossAmountPaid:     0, // No dividends
-		TotalProceedsFromSale:    share.SharesSold * share.FMVOnSaleDate * saleRate.TTBuyExchangeRate,
+		// Use ETrade's reported Total Proceeds (actual amount received).
+		TotalProceedsFromSale: share.TotalProceeds * saleRate.TTBuyExchangeRate,
 	}, nil
 }

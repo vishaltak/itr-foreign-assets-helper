@@ -79,6 +79,7 @@ func createTestGainsFile(t *testing.T) string {
 	f.SetCellValue(sheetName, "F1", "Date Sold")
 	f.SetCellValue(sheetName, "G1", "Proceeds Per Share")
 	f.SetCellValue(sheetName, "H1", "Order Number")
+	f.SetCellValue(sheetName, "I1", "Total Proceeds")
 
 	// Summary row (should be skipped)
 	f.SetCellValue(sheetName, "A2", "Summary")
@@ -92,6 +93,8 @@ func createTestGainsFile(t *testing.T) string {
 	f.SetCellValue(sheetName, "F3", "06/15/2024")
 	f.SetCellValue(sheetName, "G3", "$180.00")
 	f.SetCellValue(sheetName, "H3", "ORD123")
+	// Deliberately not equal to 50 * 180 = 9000, to prove it is read directly.
+	f.SetCellValue(sheetName, "I3", "$8,999.50")
 
 	// Delete default sheet
 	f.DeleteSheet("Sheet1")
@@ -343,6 +346,10 @@ func TestProcessor_ProcessGainsAndLosses(t *testing.T) {
 
 		if record.FMVOnSaleDate != 180.00 {
 			t.Errorf("Expected sale FMV 180.00, got %f", record.FMVOnSaleDate)
+		}
+
+		if record.TotalProceeds != 8999.50 {
+			t.Errorf("Expected total proceeds 8999.50, got %v", record.TotalProceeds)
 		}
 
 		expectedIssueDate := time.Date(2023, 3, 15, 0, 0, 0, 0, time.UTC)
