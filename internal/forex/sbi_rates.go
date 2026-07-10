@@ -114,8 +114,10 @@ func (s *SBIReferenceRates) parseCSV(r io.Reader) error {
 // stale rate far from the requested date.
 const maxRateLookbackDays = 15
 
-// GetRate gets the exchange rate for a specific date
-func (s *SBIReferenceRates) GetRate(date time.Time, adjustToPreviousMonth bool) (time.Time, ReferenceRate, error) {
+// GetRate returns the SBI reference rate to use for the given date. The
+// returned ReferenceRate carries the (adjusted) date it was taken from as
+// ReferenceRate.Date.
+func (s *SBIReferenceRates) GetRate(date time.Time, adjustToPreviousMonth bool) (ReferenceRate, error) {
 	adjustedDate := date
 
 	if adjustToPreviousMonth {
@@ -128,12 +130,12 @@ func (s *SBIReferenceRates) GetRate(date time.Time, adjustToPreviousMonth bool) 
 	searchFrom := adjustedDate
 	for i := 0; i < maxRateLookbackDays; i++ {
 		if rate, ok := s.Rates[adjustedDate.Format(time.DateOnly)]; ok {
-			return adjustedDate, rate, nil
+			return rate, nil
 		}
 		adjustedDate = adjustedDate.AddDate(0, 0, -1)
 	}
 
-	return time.Time{}, ReferenceRate{}, fmt.Errorf(
+	return ReferenceRate{}, fmt.Errorf(
 		"no exchange rate found within %d days on or before %s (searched %s..%s); SBI reference rate data likely has a gap",
 		maxRateLookbackDays,
 		searchFrom.Format(time.DateOnly),

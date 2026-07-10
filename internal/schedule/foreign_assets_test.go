@@ -42,9 +42,9 @@ func TestGenerateScheduleFAA3_CalendarYearFiltering(t *testing.T) {
 
 	// FY 2025-2026 => Schedule FA covers the calendar year 1 Jan 2025 - 31 Dec 2025.
 	sharesIssued := []stock.ShareIssuedRecord{
-		{Ticker: "IN25", AwardNumber: "1", SharesIssued: 10, IssueDate: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC), FMVPerShare: 100},
+		{Ticker: "IN25", AwardNumber: "1", SharesIssued: 10, IssueDate: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC), FMVOnIssueDate: 100},
 		// Issued after 31 Dec 2025 - outside the FA calendar year, must be excluded.
-		{Ticker: "OUT26", AwardNumber: "2", SharesIssued: 10, IssueDate: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), FMVPerShare: 100},
+		{Ticker: "OUT26", AwardNumber: "2", SharesIssued: 10, IssueDate: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), FMVOnIssueDate: 100},
 	}
 	sharesSold := []stock.ShareSoldRecord{
 		// Sold Jan-Mar 2025 (inside the FA calendar year) - must be included.
@@ -80,7 +80,7 @@ func TestGenerateScheduleFAA3_UsesDecember31ForYearEnd(t *testing.T) {
 	}
 
 	sharesIssued := []stock.ShareIssuedRecord{
-		{Ticker: "AAPL", AwardNumber: "1", SharesIssued: 10, IssueDate: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC), FMVPerShare: 100},
+		{Ticker: "AAPL", AwardNumber: "1", SharesIssued: 10, IssueDate: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC), FMVOnIssueDate: 100},
 	}
 
 	financialYear, err := stock.ParseFinancialYear("2025-2026")

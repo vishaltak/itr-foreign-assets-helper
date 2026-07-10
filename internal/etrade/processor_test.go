@@ -1,6 +1,7 @@
 package etrade
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,14 @@ import (
 	"github.com/vtak/itr-foreign-assets-helper/internal/stock"
 	"github.com/xuri/excelize/v2"
 )
+
+// writeHoldingsFooter writes the 4 trailing total rows ETrade appends to the
+// Sellable sheet (the rows the processor must skip), starting at startRow.
+func writeHoldingsFooter(f *excelize.File, sheet string, startRow int) {
+	for i, label := range []string{"Options Total", "SARS Total", "Shares Blocked total", "Overall Total"} {
+		f.SetCellValue(sheet, fmt.Sprintf("A%d", startRow+i), label)
+	}
+}
 
 func createTestHoldingsFile(t *testing.T) string {
 	f := excelize.NewFile()
@@ -36,9 +45,8 @@ func createTestHoldingsFile(t *testing.T) string {
 	f.SetCellValue(sheetName, "D2", "15-Mar-2024")
 	f.SetCellValue(sheetName, "E2", "$150.00")
 
-	// Total row (should be skipped)
-	f.SetCellValue(sheetName, "A3", "Total")
-	f.SetCellValue(sheetName, "B3", 100)
+	// Trailing total rows (should be skipped)
+	writeHoldingsFooter(f, sheetName, 3)
 
 	// Delete default sheet
 	f.DeleteSheet("Sheet1")
@@ -118,7 +126,7 @@ func TestProcessor_ProcessHoldings_AwardNumberIsString(t *testing.T) {
 	f.SetCellValue(sheetName, "D2", "15-Mar-2024")
 	f.SetCellValue(sheetName, "E2", "$150.00")
 
-	f.SetCellValue(sheetName, "A3", "Total")
+	writeHoldingsFooter(f, sheetName, 3)
 
 	f.DeleteSheet("Sheet1")
 	tmpFile := filepath.Join(t.TempDir(), "test_holdings_award.xlsx")
@@ -157,7 +165,7 @@ func TestProcessor_ProcessHoldings_DuplicateColumnFailsLoud(t *testing.T) {
 	f.SetCellValue(sheetName, "F1", "Symbol")
 
 	f.SetCellValue(sheetName, "A2", "AAPL")
-	f.SetCellValue(sheetName, "A3", "Total")
+	writeHoldingsFooter(f, sheetName, 3)
 
 	f.DeleteSheet("Sheet1")
 	tmpFile := filepath.Join(t.TempDir(), "test_holdings_dupe.xlsx")
@@ -195,7 +203,7 @@ func TestProcessor_ProcessHoldings_UnparseableDateFailsClearly(t *testing.T) {
 	f.SetCellValue(sheetName, "C2", "12345")
 	f.SetCellValue(sheetName, "D2", "2024-03-15") // wrong format (not "15-Mar-2024")
 	f.SetCellValue(sheetName, "E2", "$150.00")
-	f.SetCellValue(sheetName, "A3", "Total")
+	writeHoldingsFooter(f, sheetName, 3)
 
 	f.DeleteSheet("Sheet1")
 	tmpFile := filepath.Join(t.TempDir(), "test_holdings_baddate.xlsx")
@@ -237,9 +245,8 @@ func TestProcessor_ProcessHoldings_FractionalShares(t *testing.T) {
 	f.SetCellValue(sheetName, "D2", "15-Mar-2024")
 	f.SetCellValue(sheetName, "E2", "$150.00")
 
-	// Total row (skipped)
-	f.SetCellValue(sheetName, "A3", "Total")
-	f.SetCellValue(sheetName, "B3", 10.5)
+	// Trailing total rows (skipped)
+	writeHoldingsFooter(f, sheetName, 3)
 
 	f.DeleteSheet("Sheet1")
 	tmpFile := filepath.Join(t.TempDir(), "test_holdings_fractional.xlsx")
@@ -290,8 +297,8 @@ func TestProcessor_ProcessHoldings(t *testing.T) {
 			t.Errorf("Expected 100 shares, got %v", record.SharesIssued)
 		}
 
-		if record.FMVPerShare != 150.00 {
-			t.Errorf("Expected FMV 150.00, got %f", record.FMVPerShare)
+		if record.FMVOnIssueDate != 150.00 {
+			t.Errorf("Expected FMV 150.00, got %f", record.FMVOnIssueDate)
 		}
 
 		expectedDate := time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC)

@@ -8,22 +8,28 @@ import (
 	"github.com/vtak/itr-foreign-assets-helper/internal/stock"
 )
 
-// ForeignAssetsA3Record represents a record in Schedule FA A3
+// ForeignAssetsA3Record represents a record in Schedule FA A3.
+//
+// Each ValuationDate carries the event date, the SBI TT-buy rate applied, and
+// the date that rate was taken from. SaleDate is a zero ValuationDate for
+// issued (still-held) records; YearEnd is zero for sold records.
 type ForeignAssetsA3Record struct {
-	ShareRecord              stock.ShareRecord
-	TransactionType          stock.TransactionType
-	DateOfAcquiringInterest  time.Time
+	ShareRecord     stock.ShareRecord
+	TransactionType stock.TransactionType
+
+	IssueDate ValuationDate // Date = date of acquiring interest
+	SaleDate  ValuationDate
+	PeakClose ValuationDate // Date = peak closing date
+	YearEnd   ValuationDate // Date = last trading date on/before 31 Dec
+
+	PeakClosingValue    float64
+	YearEndClosingValue float64
+
 	InitialValueOfInvestment float64
 	PeakValueOfInvestment    float64
 	ClosingValue             float64
 	TotalGrossAmountPaid     float64
 	TotalProceedsFromSale    float64
-
-	// Additional tracking fields
-	PeakClosingDate     time.Time
-	PeakClosingValue    float64
-	YearEndClosingValue float64
-	LastTradingDate     time.Time
 }
 
 // ForeignAssetsA3 represents Schedule FA A3
@@ -99,7 +105,7 @@ func createFARecordForIssuedShare(
 	yearEnd time.Time,
 ) (ForeignAssetsA3Record, error) {
 	// Get exchange rate for issue date
-	_, issueRate, err := forexRates.GetRate(share.IssueDate, true)
+	issueRate, err := forexRates.GetRate(share.IssueDate, true)
 	if err != nil {
 		return ForeignAssetsA3Record{}, fmt.Errorf("getting issue date rate: %w", err)
 	}
@@ -111,7 +117,7 @@ func createFARecordForIssuedShare(
 	}
 
 	// Get exchange rate for peak date
-	_, peakRate, err := forexRates.GetRate(peakDate, true)
+	peakRate, err := forexRates.GetRate(peakDate, true)
 	if err != nil {
 		return ForeignAssetsA3Record{}, fmt.Errorf("getting peak date rate: %w", err)
 	}
@@ -123,24 +129,26 @@ func createFARecordForIssuedShare(
 	}
 
 	// Get exchange rate for year end (don't adjust to previous month for year-end)
-	_, yearEndRate, err := forexRates.GetRate(yearEnd, false)
+	yearEndRate, err := forexRates.GetRate(yearEnd, false)
 	if err != nil {
 		return ForeignAssetsA3Record{}, fmt.Errorf("getting year-end rate: %w", err)
 	}
 
 	return ForeignAssetsA3Record{
-		ShareRecord:              share,
-		TransactionType:          stock.TransactionIssued,
-		DateOfAcquiringInterest:  share.IssueDate,
-		InitialValueOfInvestment: share.SharesIssued * share.FMVPerShare * issueRate.TTBuyExchangeRate,
+		ShareRecord:     share,
+		TransactionType: stock.TransactionIssued,
+		IssueDate:       ValuationDate{Date: share.IssueDate, Rate: issueRate},
+		PeakClose:       ValuationDate{Date: peakDate, Rate: peakRate},
+		YearEnd:         ValuationDate{Date: lastTradingDate, Rate: yearEndRate},
+
+		PeakClosingValue:    peakClose,
+		YearEndClosingValue: yearEndClose,
+
+		InitialValueOfInvestment: share.SharesIssued * share.FMVOnIssueDate * issueRate.TTBuyExchangeRate,
 		PeakValueOfInvestment:    share.SharesIssued * peakClose * peakRate.TTBuyExchangeRate,
 		ClosingValue:             share.SharesIssued * yearEndClose * yearEndRate.TTBuyExchangeRate,
 		TotalGrossAmountPaid:     0, // No dividends
 		TotalProceedsFromSale:    0, // Not sold
-		PeakClosingDate:          peakDate,
-		PeakClosingValue:         peakClose,
-		YearEndClosingValue:      yearEndClose,
-		LastTradingDate:          lastTradingDate,
 	}, nil
 }
 
@@ -150,12 +158,12 @@ func createFARecordForSoldShare(
 	forexRates *forex.SBIReferenceRates,
 ) (ForeignAssetsA3Record, error) {
 	// Get exchange rates
-	_, issueRate, err := forexRates.GetRate(share.IssueDate, true)
+	issueRate, err := forexRates.GetRate(share.IssueDate, true)
 	if err != nil {
 		return ForeignAssetsA3Record{}, fmt.Errorf("getting issue date rate: %w", err)
 	}
 
-	_, saleRate, err := forexRates.GetRate(share.SaleDate, true)
+	saleRate, err := forexRates.GetRate(share.SaleDate, true)
 	if err != nil {
 		return ForeignAssetsA3Record{}, fmt.Errorf("getting sale date rate: %w", err)
 	}
@@ -166,21 +174,24 @@ func createFARecordForSoldShare(
 		return ForeignAssetsA3Record{}, fmt.Errorf("getting peak value: %w", err)
 	}
 
-	_, peakRate, err := forexRates.GetRate(peakDate, true)
+	peakRate, err := forexRates.GetRate(peakDate, true)
 	if err != nil {
 		return ForeignAssetsA3Record{}, fmt.Errorf("getting peak date rate: %w", err)
 	}
 
 	return ForeignAssetsA3Record{
-		ShareRecord:              share,
-		TransactionType:          stock.TransactionSold,
-		DateOfAcquiringInterest:  share.IssueDate,
+		ShareRecord:     share,
+		TransactionType: stock.TransactionSold,
+		IssueDate:       ValuationDate{Date: share.IssueDate, Rate: issueRate},
+		SaleDate:        ValuationDate{Date: share.SaleDate, Rate: saleRate},
+		PeakClose:       ValuationDate{Date: peakDate, Rate: peakRate},
+
+		PeakClosingValue: peakClose,
+
 		InitialValueOfInvestment: share.SharesSold * share.FMVOnIssueDate * issueRate.TTBuyExchangeRate,
 		PeakValueOfInvestment:    share.SharesSold * peakClose * peakRate.TTBuyExchangeRate,
 		ClosingValue:             0, // Sold before year end
 		TotalGrossAmountPaid:     0, // No dividends
 		TotalProceedsFromSale:    share.SharesSold * share.FMVOnSaleDate * saleRate.TTBuyExchangeRate,
-		PeakClosingDate:          peakDate,
-		PeakClosingValue:         peakClose,
 	}, nil
 }
