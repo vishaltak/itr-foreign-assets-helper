@@ -81,6 +81,18 @@ func TestParseYahooChart_SurfacesAPIError(t *testing.T) {
 	require.Contains(t, err.Error(), "No data found")
 }
 
+func TestParseYahooChart_NormalizesTimestampToUTCDate(t *testing.T) {
+	// Yahoo's daily-bar timestamp is the intraday market open (here 14:30 UTC);
+	// it must be normalized to that calendar date at UTC midnight.
+	ts := time.Date(2024, 12, 31, 14, 30, 0, 0, time.UTC).Unix()
+	body := yahooBody(t, []int64{ts}, []float64{56.35})
+
+	prices, err := parseYahooChart(strings.NewReader(body))
+	require.NoError(t, err)
+	require.Len(t, prices, 1)
+	assert.Equal(t, time.Date(2024, 12, 31, 0, 0, 0, 0, time.UTC), prices[0].Date)
+}
+
 // yahooTS returns the unix timestamp for noon UTC on the given date, matching
 // how Yahoo returns intraday-anchored daily timestamps. Noon keeps the calendar
 // date stable regardless of the test machine's timezone.
@@ -183,7 +195,7 @@ func TestYahooClient_GetPeakClosingValue(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 250.0, maxClose)
-	assert.Equal(t, timestamps[1], maxDate.Unix())
+	assert.Equal(t, time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC), maxDate)
 }
 
 func TestYahooClient_GetClosingPriceOnDate(t *testing.T) {
@@ -198,8 +210,25 @@ func TestYahooClient_GetClosingPriceOnDate(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 172.0, price)
-	assert.Equal(t, timestamps[2], actualDate.Unix())
+	assert.Equal(t, time.Date(2023, 12, 29, 0, 0, 0, 0, time.UTC), actualDate)
 	assert.False(t, actualDate.After(targetDate), "actual date must be on or before target")
+}
+
+func TestYahooClient_GetClosingPriceOnDate_TargetIsTradingDay(t *testing.T) {
+	// When the target date is itself a trading day, its own close must be
+	// returned - not the previous trading day's. (Yahoo daily-bar timestamps
+	// are the intraday market open, which must not be treated as "after" the
+	// target's midnight.)
+	timestamps := []int64{yahooTS(2024, 12, 27), yahooTS(2024, 12, 30), yahooTS(2024, 12, 31)}
+	closes := []float64{57.97, 56.47, 56.35}
+	client, _, _ := newYahooTestClient(t, timestamps, closes)
+
+	targetDate := time.Date(2024, 12, 31, 0, 0, 0, 0, time.UTC)
+	price, actualDate, err := client.GetClosingPriceOnDate("GTLB", targetDate)
+	require.NoError(t, err)
+
+	assert.Equal(t, 56.35, price)
+	assert.Equal(t, targetDate, actualDate)
 }
 
 func TestYahooClient_Caching(t *testing.T) {
