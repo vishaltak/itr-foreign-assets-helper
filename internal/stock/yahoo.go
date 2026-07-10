@@ -85,8 +85,17 @@ func parseYahooChart(r io.Reader) ([]PriceData, error) {
 			continue
 		}
 
+		// A daily bar represents a trading date, but Yahoo's timestamp is the
+		// intraday market-open instant. Normalize it to that calendar date at
+		// UTC midnight so the rest of the pipeline compares/formats it as a
+		// date, independent of the machine timezone. For US exchanges the open
+		// (09:30 ET = 13:30/14:30 UTC) shares the trading date's UTC calendar
+		// day, so the UTC date is the trading date.
+		ts := time.Unix(result.Timestamp[i], 0).UTC()
+		day := time.Date(ts.Year(), ts.Month(), ts.Day(), 0, 0, 0, 0, time.UTC)
+
 		prices = append(prices, PriceData{
-			Date:   time.Unix(result.Timestamp[i], 0),
+			Date:   day,
 			Open:   deref(quote.Open, i),
 			High:   deref(quote.High, i),
 			Low:    deref(quote.Low, i),
