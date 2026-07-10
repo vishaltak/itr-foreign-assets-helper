@@ -99,15 +99,19 @@ func (s ShareIssuedRecord) GetComments() string {
 
 // ShareSoldRecord represents shares sold (from gains/losses file)
 type ShareSoldRecord struct {
-	SourceMetadata  SourceMetadata
-	Broker          string
-	Ticker          string
-	AwardNumber     string
-	IssueDate       time.Time
-	FMVOnIssueDate  float64
-	SharesSold      float64
-	SaleDate        time.Time
-	FMVOnSaleDate   float64
+	SourceMetadata SourceMetadata
+	Broker         string
+	Ticker         string
+	AwardNumber    string
+	IssueDate      time.Time
+	FMVOnIssueDate float64
+	SharesSold     float64
+	SaleDate       time.Time
+	FMVOnSaleDate  float64
+	// TotalProceeds is ETrade's reported gross proceeds for the lot (USD). It
+	// is the actual amount received; SharesSold*FMVOnSaleDate only approximates
+	// it because FMVOnSaleDate (Proceeds Per Share) is rounded to 2 decimals.
+	TotalProceeds   float64
 	SaleOrderNumber string
 	Comments        string
 }

@@ -2,10 +2,33 @@ package schedule
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/vtak/itr-foreign-assets-helper/internal/forex"
 	"github.com/vtak/itr-foreign-assets-helper/internal/stock"
 )
+
+// ProceedsRoundingDiscrepancy reports, across the given sold lots, the
+// aggregate and largest single-lot INR difference between two ways of valuing
+// sale proceeds: quantity x (rounded) per-share price versus ETrade's reported
+// Total Proceeds. The schedules use Total Proceeds; this quantifies how much
+// the per-share reconstruction would have differed, so the run can advise the
+// user. Each lot is converted at its sale-date TT-buy rate; lots without a rate
+// are skipped (they are not reported anyway).
+func ProceedsRoundingDiscrepancy(sharesSold []stock.ShareSoldRecord, forexRates *forex.SBIReferenceRates) (total, largest float64) {
+	for _, s := range sharesSold {
+		rate, err := forexRates.GetRate(s.SaleDate, true)
+		if err != nil {
+			continue
+		}
+		diff := math.Abs(s.SharesSold*s.FMVOnSaleDate-s.TotalProceeds) * rate.TTBuyExchangeRate
+		total += diff
+		if diff > largest {
+			largest = diff
+		}
+	}
+	return total, largest
+}
 
 // CapitalGainsRecord represents a capital gains record
 type CapitalGainsRecord struct {
@@ -58,7 +81,9 @@ func GenerateScheduleCG(
 		}
 
 		costOfAcquisition := share.SharesSold * share.FMVOnIssueDate * issueRate.TTBuyExchangeRate
-		fullValue := share.SharesSold * share.FMVOnSaleDate * saleRate.TTBuyExchangeRate
+		// Use ETrade's reported Total Proceeds (the actual amount received), not
+		// quantity x rounded per-share price.
+		fullValue := share.TotalProceeds * saleRate.TTBuyExchangeRate
 
 		record := CapitalGainsRecord{
 			ShareRecord:              share,

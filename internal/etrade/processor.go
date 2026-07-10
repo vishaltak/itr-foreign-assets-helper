@@ -195,6 +195,7 @@ func (p *Processor) ProcessGainsAndLosses(filename string) ([]stock.ShareSoldRec
 		"Vest Date FMV":      "issue_fmv",
 		"Date Sold":          "sale_date",
 		"Proceeds Per Share": "sale_fmv",
+		"Total Proceeds":     "total_proceeds",
 		"Order Number":       "order",
 	}
 
@@ -234,6 +235,11 @@ func (p *Processor) ProcessGainsAndLosses(filename string) ([]stock.ShareSoldRec
 			return nil, fmt.Errorf("parsing sale FMV at row %d: %w", i+1, err)
 		}
 
+		totalProceeds, err := parseMoney(row[colMap["Total Proceeds"]])
+		if err != nil {
+			return nil, fmt.Errorf("parsing total proceeds at row %d: %w", i+1, err)
+		}
+
 		// Parse quantities (may be fractional)
 		shares, err := parseShares(row[colMap["Quantity"]])
 		if err != nil {
@@ -257,6 +263,7 @@ func (p *Processor) ProcessGainsAndLosses(filename string) ([]stock.ShareSoldRec
 			SharesSold:      shares,
 			SaleDate:        saleDate,
 			FMVOnSaleDate:   saleFMV,
+			TotalProceeds:   totalProceeds,
 			SaleOrderNumber: row[colMap["Order Number"]],
 		}
 

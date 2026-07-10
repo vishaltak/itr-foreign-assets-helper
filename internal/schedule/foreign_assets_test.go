@@ -48,9 +48,10 @@ func TestGenerateScheduleFAA3_CalendarYearFiltering(t *testing.T) {
 	}
 	sharesSold := []stock.ShareSoldRecord{
 		// Sold Jan-Mar 2025 (inside the FA calendar year) - must be included.
-		{Ticker: "SOLD25", AwardNumber: "3", IssueDate: time.Date(2025, 1, 5, 0, 0, 0, 0, time.UTC), FMVOnIssueDate: 100, SharesSold: 5, SaleDate: time.Date(2025, 3, 15, 0, 0, 0, 0, time.UTC), FMVOnSaleDate: 150},
+		// TotalProceeds deliberately != 5*150, to prove proceeds uses it.
+		{Ticker: "SOLD25", AwardNumber: "3", IssueDate: time.Date(2025, 1, 5, 0, 0, 0, 0, time.UTC), FMVOnIssueDate: 100, SharesSold: 5, SaleDate: time.Date(2025, 3, 15, 0, 0, 0, 0, time.UTC), FMVOnSaleDate: 150, TotalProceeds: 700},
 		// Sold before 1 Jan 2025 - outside the FA calendar year, must be excluded.
-		{Ticker: "SOLD24", AwardNumber: "4", IssueDate: time.Date(2024, 1, 5, 0, 0, 0, 0, time.UTC), FMVOnIssueDate: 100, SharesSold: 5, SaleDate: time.Date(2024, 12, 15, 0, 0, 0, 0, time.UTC), FMVOnSaleDate: 150},
+		{Ticker: "SOLD24", AwardNumber: "4", IssueDate: time.Date(2024, 1, 5, 0, 0, 0, 0, time.UTC), FMVOnIssueDate: 100, SharesSold: 5, SaleDate: time.Date(2024, 12, 15, 0, 0, 0, 0, time.UTC), FMVOnSaleDate: 150, TotalProceeds: 700},
 	}
 
 	financialYear, err := stock.ParseFinancialYear("2025-2026")
@@ -68,6 +69,14 @@ func TestGenerateScheduleFAA3_CalendarYearFiltering(t *testing.T) {
 	require.False(t, tickers["OUT26"], "share issued after 31 Dec should be excluded")
 	require.False(t, tickers["SOLD24"], "share sold before 1 Jan should be excluded")
 	require.Len(t, schedule.Records, 2)
+
+	// Proceeds for the sold lot use Total Proceeds x sale rate. Sale on
+	// 2025-03-15 -> rate for 28 Feb 2025 => 84.00 (from the mock).
+	for _, r := range schedule.Records {
+		if r.ShareRecord.GetTicker() == "SOLD25" {
+			require.Equal(t, 700.0*84.0, r.TotalProceedsFromSale)
+		}
+	}
 }
 
 func TestGenerateScheduleFAA3_UsesDecember31ForYearEnd(t *testing.T) {
