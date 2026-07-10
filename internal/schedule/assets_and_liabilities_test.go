@@ -42,19 +42,19 @@ func TestGenerateScheduleAL_HeldAsOnFinancialYearEnd(t *testing.T) {
 
 	// FY 2025-2026 => Schedule AL reflects holdings as on 31 Mar 2026.
 	heldAtYearEnd := stock.ShareIssuedRecord{
-		Ticker:       "AAPL",
-		AwardNumber:  "1",
-		SharesIssued: 10,
-		IssueDate:    time.Date(2026, 2, 15, 0, 0, 0, 0, time.UTC), // Jan-Mar 2026
-		FMVPerShare:  100.00,
+		Ticker:         "AAPL",
+		AwardNumber:    "1",
+		SharesIssued:   10,
+		IssueDate:      time.Date(2026, 2, 15, 0, 0, 0, 0, time.UTC), // Jan-Mar 2026
+		FMVOnIssueDate: 100.00,
 	}
 	// Issued after the FY end - belongs to the next FY, must be excluded.
 	issuedNextFY := stock.ShareIssuedRecord{
-		Ticker:       "MSFT",
-		AwardNumber:  "2",
-		SharesIssued: 10,
-		IssueDate:    time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC),
-		FMVPerShare:  100.00,
+		Ticker:         "MSFT",
+		AwardNumber:    "2",
+		SharesIssued:   10,
+		IssueDate:      time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC),
+		FMVOnIssueDate: 100.00,
 	}
 
 	financialYear, err := stock.ParseFinancialYear("2025-2026")
@@ -67,6 +67,8 @@ func TestGenerateScheduleAL_HeldAsOnFinancialYearEnd(t *testing.T) {
 	require.Equal(t, "AAPL", schedule.Records[0].ShareRecord.Ticker)
 	// Issue rate uses last day of previous month (Jan 2026 => 85.00).
 	require.Equal(t, 10*100.00*85.00, schedule.Records[0].CostOfAcquisition)
+	require.Equal(t, 85.00, schedule.Records[0].IssueDate.Rate.TTBuyExchangeRate)
+	require.Equal(t, time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC), schedule.Records[0].IssueDate.Rate.Date)
 }
 
 func TestGenerateScheduleAL(t *testing.T) {
@@ -74,11 +76,11 @@ func TestGenerateScheduleAL(t *testing.T) {
 
 	sharesIssued := []stock.ShareIssuedRecord{
 		{
-			Ticker:       "AAPL",
-			AwardNumber:  "12345",
-			SharesIssued: 100,
-			IssueDate:    time.Date(2023, 3, 15, 0, 0, 0, 0, time.UTC),
-			FMVPerShare:  150.00,
+			Ticker:         "AAPL",
+			AwardNumber:    "12345",
+			SharesIssued:   100,
+			IssueDate:      time.Date(2023, 3, 15, 0, 0, 0, 0, time.UTC),
+			FMVOnIssueDate: 150.00,
 		},
 	}
 

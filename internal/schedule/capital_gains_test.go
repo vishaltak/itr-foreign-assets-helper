@@ -56,6 +56,12 @@ func TestGenerateScheduleCG_FinancialYearWindow(t *testing.T) {
 	// sale rate uses last day of previous month (Jan 2026 => 85.00).
 	require.Equal(t, 10*100.00*84.00, schedule.Records[0].CostOfAcquisition)
 	require.Equal(t, 10*200.00*85.00, schedule.Records[0].FullValueOfConsideration)
+
+	// The applied rates and the (adjusted) dates they came from are recorded.
+	require.Equal(t, 84.00, schedule.Records[0].IssueDate.Rate.TTBuyExchangeRate)
+	require.Equal(t, time.Date(2025, 4, 30, 0, 0, 0, 0, time.UTC), schedule.Records[0].IssueDate.Rate.Date)
+	require.Equal(t, 85.00, schedule.Records[0].SaleDate.Rate.TTBuyExchangeRate)
+	require.Equal(t, time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC), schedule.Records[0].SaleDate.Rate.Date)
 }
 
 func TestGenerateScheduleCG(t *testing.T) {

@@ -110,7 +110,7 @@ func TestSBIReferenceRates_GetRate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualDate, actualRate, err := rates.GetRate(tt.date, tt.adjustToPreviousMonth)
+			rate, err := rates.GetRate(tt.date, tt.adjustToPreviousMonth)
 			if err != nil {
 				if tt.expectedErrorStr != "" {
 					require.Contains(t, err.Error(), tt.expectedErrorStr)
@@ -119,8 +119,8 @@ func TestSBIReferenceRates_GetRate(t *testing.T) {
 				t.Errorf("GetRate() error = %v, expectedErrorStr %v", err, tt.expectedErrorStr)
 			}
 
-			assert.Equal(t, tt.expectedDate, actualDate)
-			assert.Equal(t, tt.expectedTTBuyExchangeRate, actualRate.TTBuyExchangeRate)
+			assert.Equal(t, tt.expectedDate, rate.Date)
+			assert.Equal(t, tt.expectedTTBuyExchangeRate, rate.TTBuyExchangeRate)
 		})
 	}
 }

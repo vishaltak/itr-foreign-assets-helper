@@ -11,6 +11,17 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+const (
+	// holdingsFooterRows is the number of trailing total rows in the ETrade
+	// holdings "Sellable" sheet: "Options Total", "SARS Total",
+	// "Shares Blocked total" and "Overall Total".
+	holdingsFooterRows = 4
+
+	// gainsHeaderRows is the number of leading rows to skip in the ETrade gains
+	// "G&L_Expanded" sheet: the header row and a "Summary" row.
+	gainsHeaderRows = 2
+)
+
 // parseMoney parses a currency value, stripping a leading "$" and any
 // thousands separators (e.g. "$1,234.50" -> 1234.50).
 func parseMoney(s string) (float64, error) {
@@ -91,7 +102,7 @@ func (p *Processor) ProcessHoldings(filename string) ([]stock.ShareIssuedRecord,
 		return nil, fmt.Errorf("reading sheet %s: %w", sheetName, err)
 	}
 
-	if len(rows) < 2 {
+	if len(rows) <= holdingsFooterRows {
 		return nil, fmt.Errorf("insufficient data in holdings file")
 	}
 
@@ -110,8 +121,8 @@ func (p *Processor) ProcessHoldings(filename string) ([]stock.ShareIssuedRecord,
 
 	var records []stock.ShareIssuedRecord
 
-	// Process data rows (skip header at index 0 and total at last row)
-	for i := 1; i < len(rows)-1; i++ {
+	// Process data rows: skip the header (row 0) and the trailing total rows.
+	for i := 1; i < len(rows)-holdingsFooterRows; i++ {
 		row := rows[i]
 		if len(row) <= colMap["Purchase Date FMV"] {
 			continue // Skip incomplete rows
@@ -144,12 +155,12 @@ func (p *Processor) ProcessHoldings(filename string) ([]stock.ShareIssuedRecord,
 				SheetName: sheetName,
 				Row:       i + 1,
 			},
-			Broker:       "ETrade",
-			Ticker:       row[colMap["Symbol"]],
-			AwardNumber:  awardNum,
-			SharesIssued: shares,
-			IssueDate:    issueDate,
-			FMVPerShare:  fmv,
+			Broker:         "ETrade",
+			Ticker:         row[colMap["Symbol"]],
+			AwardNumber:    awardNum,
+			SharesIssued:   shares,
+			IssueDate:      issueDate,
+			FMVOnIssueDate: fmv,
 		}
 
 		records = append(records, record)
@@ -172,7 +183,7 @@ func (p *Processor) ProcessGainsAndLosses(filename string) ([]stock.ShareSoldRec
 		return nil, fmt.Errorf("reading sheet %s: %w", sheetName, err)
 	}
 
-	if len(rows) < 3 {
+	if len(rows) < gainsHeaderRows {
 		return nil, fmt.Errorf("insufficient data in gains file")
 	}
 
@@ -194,8 +205,8 @@ func (p *Processor) ProcessGainsAndLosses(filename string) ([]stock.ShareSoldRec
 
 	var records []stock.ShareSoldRecord
 
-	// Process data rows (skip header at 0, summary at 1)
-	for i := 2; i < len(rows); i++ {
+	// Process data rows: skip the header (row 0) and the summary row(s).
+	for i := gainsHeaderRows; i < len(rows); i++ {
 		row := rows[i]
 		if len(row) <= colMap["Order Number"] {
 			continue // Skip incomplete rows

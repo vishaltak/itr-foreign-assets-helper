@@ -10,8 +10,8 @@ import (
 // AssetsAndLiabilitiesRecord represents an asset/liability record
 type AssetsAndLiabilitiesRecord struct {
 	ShareRecord       stock.ShareIssuedRecord
+	IssueDate         ValuationDate
 	CostOfAcquisition float64
-	CostOfImprovement float64
 }
 
 // AssetsAndLiabilities represents Schedule AL
@@ -37,15 +37,15 @@ func GenerateScheduleAL(
 		}
 
 		// Get exchange rate
-		_, issueRate, err := forexRates.GetRate(share.IssueDate, true)
+		issueRate, err := forexRates.GetRate(share.IssueDate, true)
 		if err != nil {
 			return nil, fmt.Errorf("getting issue rate: %w", err)
 		}
 
 		record := AssetsAndLiabilitiesRecord{
 			ShareRecord:       share,
-			CostOfAcquisition: share.SharesIssued * share.FMVPerShare * issueRate.TTBuyExchangeRate,
-			CostOfImprovement: 0,
+			IssueDate:         ValuationDate{Date: share.IssueDate, Rate: issueRate},
+			CostOfAcquisition: share.SharesIssued * share.FMVOnIssueDate * issueRate.TTBuyExchangeRate,
 		}
 
 		schedule.Records = append(schedule.Records, record)

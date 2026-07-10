@@ -10,6 +10,8 @@ import (
 // CapitalGainsRecord represents a capital gains record
 type CapitalGainsRecord struct {
 	ShareRecord              stock.ShareSoldRecord
+	IssueDate                ValuationDate
+	SaleDate                 ValuationDate
 	CostOfAcquisition        float64
 	CostOfImprovement        float64
 	ExpenditureOnTransfer    float64
@@ -45,12 +47,12 @@ func GenerateScheduleCG(
 		}
 
 		// Get exchange rates
-		_, issueRate, err := forexRates.GetRate(share.IssueDate, true)
+		issueRate, err := forexRates.GetRate(share.IssueDate, true)
 		if err != nil {
 			return nil, fmt.Errorf("getting issue rate: %w", err)
 		}
 
-		_, saleRate, err := forexRates.GetRate(share.SaleDate, true)
+		saleRate, err := forexRates.GetRate(share.SaleDate, true)
 		if err != nil {
 			return nil, fmt.Errorf("getting sale rate: %w", err)
 		}
@@ -60,6 +62,8 @@ func GenerateScheduleCG(
 
 		record := CapitalGainsRecord{
 			ShareRecord:              share,
+			IssueDate:                ValuationDate{Date: share.IssueDate, Rate: issueRate},
+			SaleDate:                 ValuationDate{Date: share.SaleDate, Rate: saleRate},
 			CostOfAcquisition:        costOfAcquisition,
 			CostOfImprovement:        0,
 			ExpenditureOnTransfer:    0,

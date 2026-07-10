@@ -77,7 +77,7 @@ type ShareIssuedRecord struct {
 	AwardNumber    string
 	SharesIssued   float64
 	IssueDate      time.Time
-	FMVPerShare    float64
+	FMVOnIssueDate float64
 	Comments       string
 }
 
